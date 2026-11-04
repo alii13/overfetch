@@ -413,7 +413,9 @@ def polling(api: List[Request]) -> List[dict]:
             "span_ms": round(ts[-1] - ts[0]),
             "page": items[0].page,
             "note": (
-                f"{timers} timers on one key: the same poll option is active in {timers} observers, each on its own clock."
+                f"{timers} interleaved clocks on one URL. With TanStack Query that means {timers} different query keys "
+                "or clients (observers on one key re-sync and share a fetch); with SWR, Apollo or hand-rolled timers "
+                f"it can be {timers} observers of one read."
                 if timers > 1 else "Single periodic poll; check it stops when the data settles and when the user is idle."
             ),
         })

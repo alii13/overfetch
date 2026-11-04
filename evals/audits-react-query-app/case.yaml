@@ -3,8 +3,9 @@ name: audits-react-query-app
 expected_outcome: |
   A ranked audit report in audit.md that names the planted issues with file:line
   evidence and a concrete fix for each: the per-row AgentRow query (batch names),
-  the poll option inside useBillingSummary that two components call (timers stack,
-  keep one poller), the blanket invalidateQueries() in SearchBox's onChange (top
+  the poll option inside useBillingSummary that two components call (same-key
+  TanStack observers re-sync, so the rate is the shortest interval; still keep
+  one owner), the blanket invalidateQueries() in SearchBox's onChange (top
   severity), the QueryClient with no default staleTime, staleTime: 0 on the agent
   list, the effect-driven fetch and uncleared setInterval in LegacyPanel, the
   serial awaits / unbounded Promise.all / limit 1000 loop in loaders.ts, and the

@@ -53,7 +53,9 @@ class StaticScanTests(unittest.TestCase):
         hits = self.by_id("shared-poll-timer")
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0]["file"], "src/lib/use-billing-summary.ts")
-        self.assertEqual(hits[0]["severity"], "P0")
+        # The fixture uses TanStack Query, whose same-key observers re-sync: ownership, not a multiplier.
+        self.assertEqual(hits[0]["severity"], "P2")
+        self.assertIn("re-sync", hits[0]["title"])
         self.assertEqual(len(hits[0]["extra"]["importers"]), 2)
 
     def test_always_on_poll_resolves_constant(self) -> None:
@@ -155,6 +157,7 @@ class HarAnalyzeTests(unittest.TestCase):
         bursts = self.result["bursts"]
         self.assertEqual(len(bursts), 1)
         self.assertIn("/api/v1/agents/{id}", bursts[0]["template"])
+        self.assertIn("interleaved clocks", next(p for p in self.result["polling"] if p["timers"] > 1)["note"])
         self.assertEqual(bursts[0]["distinct_ids"], 20)
         self.assertGreaterEqual(bursts[0]["peak_in_flight"], 5)
 

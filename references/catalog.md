@@ -47,11 +47,16 @@ If no batch endpoint exists, keep the per-row reads but bound them (see `unbound
 
 **Shape.** `refetchInterval` (TanStack), `refreshInterval` (SWR) or `pollInterval` (Apollo) inside a hook or options factory that more than one component calls.
 
-**Cost.** Each observer runs its own timer. Three mounted callers on a 60 s interval produce three fetches per minute, on three clocks. Growth: with mounted observers (P0 when always-on, P1 when the interval is a function that stops).
+**Cost.** Depends on the library, and this is where audits overclaim.
 
-**Confirm.** List the importers the scan found and ask which can be mounted at the same time on one screen. The shell plus any settings panel is the usual pair. A capture shows it as one URL with k interleaved timers; `har_analyze.py` prints `timers: k`.
+- TanStack Query: one interval per observer, but every observer's interval restarts on each query update and the fetches share the in-flight promise, so observers on one key fire together and the endpoint sees one fetch per interval. The shortest interval any caller passes wins. The cost is cadence ownership: the poll runs as long as any caller is mounted, and its period is defined in several places. Growth: none by itself (P2). Timers stack only across different keys or clients.
+- SWR and Apollo: one independent timer per hook instance; fetches multiply unless they land inside the dedup window (2 s for SWR, in-flight only for Apollo). Growth: with mounted observers (P0 when always-on, P1 when the interval is a function that stops).
+- RTK Query: one timer per cache entry at the shortest interval; nothing stacks.
+- Hand-rolled `setInterval`: always one fetch per timer.
 
-**Non-finding when:** only one caller can ever be mounted; the library is RTK Query (one timer per cache entry at the shortest interval); the option is passed by exactly one caller and the hook only forwards it.
+**Confirm.** List the importers the scan found and ask which can be mounted at the same time on one screen. A capture shows stacking as one URL with k interleaved clocks; `har_analyze.py` prints `timers: k`. In a TanStack app, k > 1 on one URL means k different query keys or clients, so find the key difference rather than counting observers.
+
+**Non-finding when:** only one caller can ever be mounted; the library is TanStack or RTK Query and every caller uses the same key and interval (record it as cadence ownership, P2 or info); the option is passed by exactly one caller and the hook only forwards it.
 
 **Fix: single poller.** The poll lives in one owner that is always mounted (the shell, a status provider). Everyone else uses the same key with no interval and reads the cache.
 
@@ -62,7 +67,7 @@ useQuery({ ...billingSummaryQuery(orgId), refetchInterval: 60_000 })
 useQuery(billingSummaryQuery(orgId))
 ```
 
-**Delta.** k fetches per period → 1.
+**Delta.** SWR/Apollo: k fetches per period → 1. TanStack: unchanged request count; one definition of the cadence instead of k, and a poll that stops when the owner unmounts.
 
 ---
 

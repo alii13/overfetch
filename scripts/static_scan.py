@@ -506,7 +506,10 @@ def enclosing_export(f: SourceFile, offset: int) -> Optional[str]:
     return best
 
 
-def detect_shared_polls(files: List[SourceFile], graph: ImportGraph) -> List[Finding]:
+def detect_shared_polls(files: List[SourceFile], graph: ImportGraph, resyncing_library: bool) -> List[Finding]:
+    """`resyncing_library` is True for TanStack Query, whose same-key observers restart their
+    intervals on every query update and share one fetch (see references/library-facts.md).
+    SWR and Apollo run one independent timer per instance, so their fetches multiply."""
     findings: List[Finding] = []
     for f in files:
         for match in POLL_OPTION_RE.finditer(f.text):
@@ -519,28 +522,46 @@ def detect_shared_polls(files: List[SourceFile], graph: ImportGraph) -> List[Fin
             callers = graph.importers_of(module_id(f.rel), symbol) if symbol else []
             importer_count = len(callers)
             if shared_hook and importer_count >= 2:
-                severity, confidence = ("P0", "high") if kind == "always-on" else ("P1", "medium")
+                if resyncing_library:
+                    severity, confidence = "P2", "medium"
+                    title = f"Poll interval inside `{symbol}`, imported by {importer_count} modules (same-key observers re-sync; the shortest interval wins)"
+                    why = (
+                        "TanStack Query restarts every observer's interval on each query update and shares the "
+                        "in-flight fetch, so callers on one key cost one fetch per interval, not one per caller. "
+                        "The cost here is ownership: the poll runs while any caller is mounted, its period is "
+                        "defined in several places, and the shortest one wins. Timers only stack across "
+                        "different keys or clients."
+                    )
+                    verify = (
+                        "Check whether every caller builds the same key: " + ", ".join(callers[:6])
+                        + ". Different scopes (org vs workspace) are different keys and do stack; confirm with a capture."
+                    )
+                else:
+                    severity, confidence = ("P0", "high") if kind == "always-on" else ("P1", "medium")
+                    title = f"Poll interval inside `{symbol}`, imported by {importer_count} modules"
+                    why = (
+                        "SWR and Apollo run one independent interval timer per hook instance. A poll option in "
+                        "a shared hook adds a timer for every component that calls it, each on its own clock, "
+                        "so the endpoint is hit several times per period once the clocks drift apart."
+                    )
+                    verify = (
+                        "Count mounted callers on a typical screen: " + ", ".join(callers[:6])
+                        + ". If more than one can be mounted at once, the timers stack."
+                    )
                 findings.append(Finding(
                     id="shared-poll-timer",
-                    title=f"Poll interval inside `{symbol}`, imported by {importer_count} modules",
+                    title=title,
                     severity=severity,
                     confidence=confidence,
                     file=f.rel,
                     line=line,
                     snippet=f.line_text(line),
-                    why=(
-                        "Query libraries run one interval timer per observer, not per key. A poll option in "
-                        "a shared hook adds a timer for every component that calls it, each on its own clock, "
-                        "so the endpoint is hit several times per period."
-                    ),
+                    why=why,
                     fix=(
                         "Keep the poll in exactly one owner (the shell or a single subscriber component) and "
                         "let everyone else read the cache; or gate the option so only one caller passes it."
                     ),
-                    verify=(
-                        "Count mounted callers on a typical screen: " + ", ".join(callers[:6])
-                        + ". If more than one can be mounted at once, the timers stack."
-                    ),
+                    verify=verify,
                     catalog="shared-poll-timer",
                     extra={"importers": callers, "interval": value},
                 ))
@@ -1040,7 +1061,7 @@ def detect_platform_notes(files: List[SourceFile]) -> List[Finding]:
 
 DETECTORS = [
     ("per-row-query", lambda ctx: detect_per_row_queries(ctx["files"], ctx["hooks"], ctx["graph"])),
-    ("shared-poll-timer", lambda ctx: detect_shared_polls(ctx["files"], ctx["graph"])),
+    ("shared-poll-timer", lambda ctx: detect_shared_polls(ctx["files"], ctx["graph"], ctx["resyncing_library"])),
     ("freshness", lambda ctx: detect_freshness(ctx["files"])),
     ("broad-invalidation", lambda ctx: detect_broad_invalidation(ctx["files"])),
     ("manual-fetching", lambda ctx: detect_manual_fetching(ctx["files"])),
@@ -1062,7 +1083,11 @@ def run(root: str, excludes: List[str], min_confidence: str) -> Dict[str, object
     files = collect_files(root, excludes)
     graph = build_import_graph(files, root)
     hooks = data_hooks(files)
-    ctx = {"files": files, "graph": graph, "hooks": hooks}
+    libraries = detect_libraries(root)
+    ctx = {
+        "files": files, "graph": graph, "hooks": hooks,
+        "resyncing_library": any("TanStack" in lib or "React Query" in lib for lib in libraries),
+    }
     findings: List[Finding] = []
     for _name, detector in DETECTORS:
         findings.extend(detector(ctx))
@@ -1075,7 +1100,7 @@ def run(root: str, excludes: List[str], min_confidence: str) -> Dict[str, object
         "files_scanned": len(files),
         "query_hook_call_sites": query_sites,
         "data_hooks_found": sorted(hooks),
-        "libraries": detect_libraries(root),
+        "libraries": libraries,
         "counts": {
             sev: sum(1 for f in findings if f.severity == sev) for sev in SEVERITY_ORDER
         },

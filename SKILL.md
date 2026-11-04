@@ -25,7 +25,7 @@ Offer to implement fixes afterwards, one PR per finding, highest severity first.
 
 **Measured beats claimed.** A capture of the running app is the truth about request counts; the code is the truth about why. Comments, docs and old audit records are claims. When a doc says "fresh for 60 seconds" and the code says `staleTime: Infinity`, report the code, note the contradiction, and record the commit hash you read.
 
-**Know the library's real semantics before you blame it.** The mistakes that cost the most are confident claims that are wrong: "the cache dedupes this" when the keys differ, "polling pauses when idle" when it only pauses when hidden, "one timer per key" when the library runs one timer per observer. `references/library-facts.md` holds the facts for TanStack Query, SWR, Apollo and RTK Query. Read the section for the library in use before writing any sentence about caching or polling.
+**Know the library's real semantics before you blame it.** The mistakes that cost the most are confident claims that are wrong: "the cache dedupes this" when the keys differ, "polling pauses when idle" when it only pauses when hidden, "three callers, three fetches a minute" when the library re-syncs same-key timers and shares the fetch. `references/library-facts.md` holds the facts for TanStack Query, SWR, Apollo and RTK Query, with the source path each was checked against. Read the section for the library in use before writing any sentence about caching or polling, and when a claim decides a finding, open the installed library's source and confirm it.
 
 **Rank by growth, not by count.** A read that scales with rows, with mounted components, or with time is worse than a fixed duplicate. The severity rubric below is about growth class.
 
@@ -76,7 +76,7 @@ These need reading, not grepping. Do all of them; most audits find at least one.
 - **Key canonicality.** Pick the five most-read endpoints and find every query key that reads each one. Two keys for one read is two cache entries and two fetches. Look especially for list reads under different projections (full vs names-only) and for scope differences (org vs workspace) that are not really different data.
 - **Shared in-flight reads.** Two components mounting in the same frame with the same key share one request only if the key is identical at that moment. Keys built from state that settles a tick later (an id that arrives from another query) produce two fetches: one with `undefined`, one real. Check `enabled` gates on dependent keys.
 - **Freshness per surface.** Make a table of staleTime per data family (identity, lists, details, live status) and compare with how fast each really changes. The usual bug is one global value that is right for nothing.
-- **Polling ownership.** For every poll option in a shared hook or options factory, list the components that can be mounted at once. In TanStack Query, SWR and Apollo each one runs its own timer. In RTK Query one timer per cache entry runs at the shortest interval.
+- **Polling ownership.** For every poll option in a shared hook or options factory, list the components that can be mounted at once and the key each one uses. In SWR and Apollo each instance runs its own timer and the fetches multiply unless they land in a dedup window. In TanStack Query the timers restart on every query update and share one fetch, so same-key observers cost one fetch per shortest interval; stacking shows up across keys or clients, and the finding is cadence ownership. In RTK Query one timer per cache entry runs at the shortest interval.
 - **Focus and visibility.** What fires focus refetches on this platform? A desktop shell (Tauri, Electron) often wires OS window focus, which fires far more often than tab visibility. Which polls pause when hidden, and which keep running while the user is idle on a visible screen?
 - **Concurrency ceiling.** Is there a limiter for fan-out reads, and what is it? Note that a 6-in-flight limiter is not a 6-requests-per-second limit; do not write one as the other.
 - **Pagination contract.** For unknown-total collections, does the client stop when a page comes back short, or does it keep asking until an empty page? Check page sizes against what the screen can show.
@@ -111,9 +111,9 @@ Use the rubric:
 
 | Severity | Growth class | Typical shapes |
 | --- | --- | --- |
-| P0 | Grows without a ceiling: with rows, with mounted observers, or with time | per-row query on a paginated list, poll timer in a shared hook, invalidation on every keystroke, uncleared interval |
+| P0 | Grows without a ceiling: with rows, with mounted observers, or with time | per-row query on a paginated list, per-instance poll timers in a shared hook (SWR, Apollo, hand-rolled), invalidation on every keystroke, uncleared interval |
 | P1 | Fixed multiplier on a hot path | staleTime 0 on a list every screen reads, refetch on every focus, effect-driven fetch with no cache, unbounded `Promise.all` fan-out |
-| P2 | Latency or bytes, not count growth | serial awaits that could run together, fetch-everything page sizes, full detail read for a label |
+| P2 | Latency, bytes, or ownership, not count growth | serial awaits that could run together, fetch-everything page sizes, full detail read for a label, a TanStack poll defined in several callers |
 | P3 | Hygiene that enables the above | inline keys that drift, HTTP calls outside the data layer |
 | info | Worth recording, not a defect | hover prefetch that is one read per row, persistence and focus semantics, retry defaults |
 
@@ -142,7 +142,7 @@ The catalog has the detail; these are the names to use in the report so a reader
 ## Things that have gone wrong before
 
 - Reporting "the cache dedupes this" without checking the keys were identical at the same instant. Dependent ids settle a render later.
-- Writing "polls every 60 s" for a hook three components call. Measured: three fetches per minute, on three clocks.
+- Writing "three callers, three fetches per minute" for a TanStack hook without reading `onQueryUpdate`. Same-key observers restart their intervals on every query update and share the fetch, so the rate is the shortest interval, not callers × rate. That claim reached a merged PR description before anyone opened the library source. A capture settles it: one URL shows one clock or several.
 - Calling a hover prefetch a finding. For a bounded list with one deduped read per row it is working as designed; record it under non-findings.
 - Counting POSTs with the same URL as duplicates. Different bodies are different reads.
 - Trusting the repo's audit doc for staleTime values. Three of four were wrong at the commit being audited.

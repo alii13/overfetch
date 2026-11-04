@@ -21,7 +21,7 @@ Excerpt from a run against a fixture app:
 ```
 | # | Severity | Finding                                                   | Growth | Measured                 | Fix pattern             | Effort |
 | 1 | P0       | AgentRow fetches each agent to print its name             | rows   | 100 → 1 (fixture, 100)   | Batch names projection  | 2 h    |
-| 2 | P0       | useBillingSummary polls from every caller (3 on screen)   | mounts | 3/min → 1/min            | Single poller           | 1 h    |
+| 2 | P2       | useBillingSummary defines the 60 s poll in a hook 3 callers share | cadence | unmeasured (same key re-syncs) | Single poller      | 1 h    |
 | 3 | P0       | SearchBox invalidates every query on each keystroke       | time   | unmeasured: keys × mounted | Narrow invalidation   | 1 h    |
 ```
 
@@ -70,7 +70,7 @@ node scripts/capture.mjs http://localhost:5173/ capture.har --journey journey.js
 | Pattern | Detected by | Severity |
 | --- | --- | --- |
 | Query hook inside a row component (N+1) | scan + capture bursts | P0 |
-| Poll interval in a hook several components call (timers stack) | scan + capture `timers: k` | P0 / P1 |
+| Poll interval in a hook several components call (timers stack in SWR/Apollo; re-sync in TanStack, so cadence ownership) | scan + capture `timers: k` | P0 to P2 by library |
 | Unconditional poll; `setInterval` driving reads; uncleared timers | scan + capture | P0 to P2 |
 | No default `staleTime`; `staleTime: 0`; `"always"` refetch modes | scan + capture duplicates | P1 |
 | Blanket invalidation, especially from input handlers | scan | P0 / P2 |
