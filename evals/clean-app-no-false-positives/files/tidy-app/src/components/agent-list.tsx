@@ -18,7 +18,6 @@ export function AgentList({ orgId }: { orgId: string }) {
   const { data } = useQuery({
     queryKey: agentKeys.list(orgId),
     queryFn: () => api.listAgents({ orgId, limit: 50 }),
-    // Polls only while an agent is still being created; this list is the one owner of the poll.
     refetchInterval: (query) => (query.state.data?.items.some((a) => a.status === "creating") ? 5000 : false),
   })
   const ids = (data?.items ?? []).map((agent) => agent.id)

@@ -7,6 +7,8 @@ expected_outcome: |
   invalidation is narrow, and the loader runs its reads in parallel. It states
   that the claim of N+1 and polling storms is not supported by the code, names
   what was checked, and notes the audit is static-only. It may list hygiene
-  items (P3/info) but must not recommend a rewrite.
+  items (P3/info) but must not recommend a rewrite. The one real defect it
+  should catch: the list response already carries name, so the names read is
+  redundant and a rename leaves the names cache stale for five minutes.
 context:
   scaffold_script: place-files.sh
