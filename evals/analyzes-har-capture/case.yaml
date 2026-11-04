@@ -11,6 +11,7 @@ expected_outcome: |
   read that cannot succeed). It must not call the third POST /v1/search a
   duplicate (its body differs) and must exclude the three static assets from the
   API count (49 API requests). It should say what cannot be concluded without
-  the source.
+  the source, keep attributions consistent with the capture's page labels, and
+  mark causes it cannot see (keys, hooks, independence) as inferences.
 context:
   scaffold_script: place-files.sh
