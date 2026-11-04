@@ -13,7 +13,7 @@ export function AgentRow({ agentId }: Props) {
     queryKey: agentKeys.detail(agentId),
     queryFn: () => api.getAgent(agentId),
   })
-  if (isLoading) return <li>…</li>
+  if (isLoading) return <li data-agent-id={agentId}>…</li>
   if (!agent) return null
-  return <li>{agent.name}</li>
+  return <li data-agent-id={agentId}>{agent.name}</li>
 }

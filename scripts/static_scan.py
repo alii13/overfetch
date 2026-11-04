@@ -893,7 +893,8 @@ def detect_detail_for_label(files: List[SourceFile]) -> List[Finding]:
             # Uses of the variable after the hook call, within the enclosing function.
             fn_close = matching_close(f.text, f.text.rfind("{", 0, match.start()))
             scope = f.text[close + 1:fn_close]
-            uses = [m for m in re.finditer(rf"\b{re.escape(var)}\b(?!\s*=[^=>])", scope)]
+            # Not part of a hyphenated name (`data-agent-id`) or a property (`x.agent`).
+            uses = [m for m in re.finditer(rf"(?<![-.\w$]){re.escape(var)}(?![-\w$])(?!\s*=[^=>])", scope)]
             if not uses:
                 continue
             label_uses = 0
