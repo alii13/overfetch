@@ -196,6 +196,9 @@ class HarAnalyzeTests(unittest.TestCase):
         self.assertGreaterEqual(longest["length"], 4)
         self.assertEqual(longest["steps"][0], "GET /v1/me")
         self.assertIn("GET /v1/flags", longest["steps"])
+        # Requests that overlap with others are parallel work, not links in a serial chain.
+        for chain in chains:
+            self.assertFalse(any("/api/v1/agents/agent_" in step for step in chain["steps"]), chain["steps"])
 
     def test_repeated_404(self) -> None:
         errs = [e for e in self.result["errors"] if e["key"].startswith("404")]
@@ -224,7 +227,7 @@ class HarAnalyzeTests(unittest.TestCase):
     def test_markdown_renders(self) -> None:
         md = har_analyze.to_markdown(self.result, self.path)
         self.assertIn("## Per-row bursts", md)
-        self.assertIn("2 timers", md)
+        self.assertIn("2 interleaved clocks", md)
 
     def test_cli_rejects_missing_file(self) -> None:
         self.assertEqual(har_analyze.main(["/nonexistent.har"]), 2)

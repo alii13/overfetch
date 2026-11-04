@@ -423,20 +423,32 @@ def polling(api: List[Request]) -> List[dict]:
     return out
 
 
+def solitary(r: Request, items: List[Request]) -> bool:
+    """True when no other request is in flight at any point while `r` is."""
+    return not any(o.index != r.index and o.start_ms < r.end_ms and o.end_ms > r.start_ms for o in items)
+
+
 def serial_chains(api: List[Request], gap_ms: float, min_len: int = 3) -> List[dict]:
+    """Runs of requests where each started alone, just after the previous one ended.
+
+    A request that overlaps anything else is parallel work (a burst, a fan-out),
+    so it can neither start nor extend a chain; otherwise a 20-read burst with
+    staggered starts reads as a 20-step waterfall.
+    """
     items = sorted(api, key=lambda r: r.start_ms)
+    alone = {r.index for r in items if solitary(r, items)}
     chains: List[List[Request]] = []
     used = set()
     for i, head in enumerate(items):
-        if head.index in used:
+        if head.index in used or head.index not in alone:
             continue
         chain = [head]
         last = head
         for nxt in items[i + 1:]:
-            if nxt.index in used:
+            if nxt.index in used or nxt.index not in alone:
                 continue
             if nxt.start_ms < last.end_ms:
-                continue  # overlaps: parallel, not serial
+                continue
             if nxt.start_ms - last.end_ms > gap_ms:
                 if nxt.start_ms - last.end_ms > gap_ms * 10:
                     break
