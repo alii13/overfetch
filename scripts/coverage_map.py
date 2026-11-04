@@ -390,7 +390,7 @@ def load_capture_signals(hars: List[str], visited_files: List[str]) -> dict:
                     if header.get("name", "").lower() == "referer":
                         visited.append(header.get("value", ""))
                 url = entry.get("request", {}).get("url", "")
-                if "/__request-audit__/visit" in url:
+                if "/__overfetch__/visit" in url:
                     visited.extend(parse_qs(urlsplit(url).query).get("url", []))
     for path in visited_files:
         with open(path, encoding="utf-8") as handle:
@@ -483,7 +483,7 @@ def build_map(root: str, excludes: List[str], hars: List[str], visited_files: Li
         loaded = {mid for mid in modules if module_loaded(by_mid[mid].rel, request_paths, chunk_bases)}
         templates = {template_path(p)[0] for p in request_paths
                      if not STATIC_EXT_RE.search(p) and "/@" not in p and "/node_modules/" not in p
-                     and "__request-audit__" not in p}
+                     and "__overfetch__" not in p}
         capture = {
             "files": hars + visited_files,
             "requests": len(signals["urls"]),

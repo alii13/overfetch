@@ -1,0 +1,674 @@
+{
+  "skill": "overfetch",
+  "method": "Each case runs once with the skill and once without (control). A separate grader agent checks each report against the case's assertions and quotes its evidence.",
+  "iterations": [
+    {
+      "name": "iteration-1",
+      "date": "2026-11-04",
+      "model": "Claude Fable 5.1",
+      "runs_per_configuration": 1,
+      "totals": {
+        "with_skill": {
+          "passed": 21,
+          "total": 21,
+          "rate": 1.0,
+          "mean_tokens": 171568,
+          "mean_seconds": 404.6
+        },
+        "without_skill": {
+          "passed": 18,
+          "total": 21,
+          "rate": 0.857,
+          "mean_tokens": 150067,
+          "mean_seconds": 354.8
+        }
+      },
+      "cases": [
+        {
+          "case": "audits-react-query-app",
+          "description": "App audit: planted issues, file routes, a lazily loaded flag-gated dialog",
+          "with_skill": {
+            "passed": 8,
+            "total": 8,
+            "tokens": 169014,
+            "seconds": 410.2,
+            "assertions": [
+              {
+                "text": "audit.md names the per-row query in src/components/agent-row.tsx as a top-severity (P0) finding and recommends one batch read keyed on the set of ids instead of one read per row",
+                "passed": true,
+                "evidence": "Findings table row 2: 'P0 | `AgentRow` fetches the whole agent to print its name, once per row'. Section 2 evidence cites `src/components/agent-row.tsx:12-15`. Fix: pass `name` down from the list; fallback 'use the batch names projection that already exists in this tree: move `useAgentNames` from `src/components/clean-list.tsx:7-22` to `src/lib/`, call it once in `AgentList`' (chunked, keyed on agentKeys.names(chunk)). Delta: 'R detail reads per list mount -> 0 ... or ceil(R/100)'."
+              },
+              {
+                "text": "audit.md flags refetchInterval inside src/lib/use-billing-summary.ts, explains that each calling component runs its own timer so the endpoint is polled once per mounted caller, and recommends a single owner for the poll",
+                "passed": true,
+                "evidence": "Finding 5 (P1): evidence `src/lib/use-billing-summary.ts:14-19` with callers billing-banner.tsx:4 and billing-settings.tsx:4. Cause: 'TanStack Query schedules one interval timer per observer, so two callers are two timers ... a third caller makes it 3.' Fix: 'single poller. Keep the key and `queryFn` in `useBillingSummary` with no `refetchInterval`; pass the interval from exactly one always-mounted owner'. Severity downgraded to P1 with the stacking explained and one owner recommended, which the grading note allows. (Its stated failure mode, that a mount offset yields 2 fetches/min, is wrong for query-core 5.102: onQueryUpdate restarts every observer's interval so same-key observers re-sync; the assertion's required content is nonetheless present.)"
+              },
+              {
+                "text": "audit.md ranks the bare invalidateQueries() in src/components/search-box.tsx onChange handler as P0 or the highest severity, because it refetches every mounted query on every keystroke",
+                "passed": true,
+                "evidence": "Findings table row 1: 'P0 | `invalidateQueries()` with no filter on every keystroke'. Section 1: evidence `src/components/search-box.tsx:10-14`; cause: 'matches every query in the cache, marks each stale, and refetches every one that has an observer ... On this screen every query has an observer.' Delta 53 per keystroke -> 0."
+              },
+              {
+                "text": "audit.md flags that the QueryClient in src/main.tsx sets no default staleTime (so it is 0) and recommends a default",
+                "passed": true,
+                "evidence": "Scope table: '`new QueryClient()` with no options (`src/main.tsx:7`): staleTime 0 ...'. Finding 4 (P1) evidence: '`src/main.tsx:7` (`new QueryClient()` with no `defaultOptions`)'. Fix: code block setting `defaultOptions.queries.staleTime: 30_000` plus a retry predicate, and a per-family freshness table."
+              },
+              {
+                "text": "audit.md flags staleTime: 0 in src/components/agent-list.tsx, the useEffect fetch and the never-cleared setInterval in src/components/legacy-panel.tsx, and at least two of: the sequential awaits, the unbounded Promise.all, the limit 1000 fetch-all loop in src/lib/loaders.ts",
+                "passed": true,
+                "evidence": "Finding 4: '`src/components/agent-list.tsx:12` (`staleTime: 0` on the agent list)'. Finding 3: '`src/components/legacy-panel.tsx:12-16` (a `useEffect` that calls `fetch(\"/v1/status\")` once on mount) and `src/components/legacy-panel.tsx:19-23` (a `useEffect` that starts `setInterval(..., 5000)` and returns no cleanup)'. Dormant table: 6 `loadAllAgents` limit 1000 loop (`loaders.ts:22-32`), 6b `loadAgentDetails` `Promise.all` no ceiling (`loaders.ts:16-19`), 6c `loadHome` sequential awaits (`loaders.ts:9-13`). All three loaders defects flagged."
+              },
+              {
+                "text": "audit.md explicitly lists src/components/clean-list.tsx (CleanList / useAgentNames) as a non-finding or as correct, and does not recommend changing it",
+                "passed": true,
+                "evidence": "'Leave alone (non-findings)' table: '`useAgentNames` in `src/components/clean-list.tsx:7-22` | The batch names projection done right ... Reuse it for finding 2; do not rewrite it.' Also lists the data-driven poll (clean-list.tsx:34) as 'the pattern findings 3 and 5 should copy' and the narrow invalidation (clean-list.tsx:39) as fine. The only nudge is an aside in finding 7 ('While there, sort and dedupe ids before chunking in `useAgentNames` ... a hygiene note, not a count problem today'), which does not flag CleanList as a defect."
+              },
+              {
+                "text": "audit.md states that no live capture was taken (static-only) and gives deltas as formulas or \"unmeasured\" rather than inventing measured request counts",
+                "passed": true,
+                "evidence": "Opening: 'This is a static-only audit: no running app and no capture, so every count below is a formula evaluated at the page size the code sets (50 rows), not a measurement.' Scope table 'Captures | none'. Findings table Measured column reads 'unmeasured; K x (R + 3) = 53 per keystroke', 'unmeasured; R + 1 = 51', etc. Limits: 'Static only. No capture, so no before/after counts and no production volume. Every number is a formula at R = 50 with the inputs named'."
+              },
+              {
+                "text": "audit.md has a ranked findings table with severities and file:line references, plus a non-findings section and a limits section",
+                "passed": true,
+                "evidence": "'## Findings' table with columns #, Severity, Finding, Growth, Measured, Fix pattern, Effort, ranked 1-5 (P0, P0, P0, P1, P1), plus a dormant-code table (6, 6b, 6c, 7). file:line references sit in the 'Evidence:' line directly under each finding (e.g. `src/components/search-box.tsx:10-14`, `src/components/agent-row.tsx:12-15`) rather than in the table cells. '## Leave alone (non-findings)' table with reasons. '## Limits' section with five bullets."
+              }
+            ]
+          },
+          "without_skill": {
+            "passed": 6,
+            "total": 8,
+            "tokens": 153578,
+            "seconds": 482.9,
+            "assertions": [
+              {
+                "text": "audit.md names the per-row query in src/components/agent-row.tsx as a top-severity (P0) finding and recommends one batch read keyed on the set of ids instead of one read per row",
+                "passed": false,
+                "evidence": "The per-row query is finding 4 at P1, not P0: '### 4. P1 - `src/components/agent-row.tsx:12-15` with `src/components/agent-list.tsx:16-17` - N+1 detail reads to print a name'. The three P0 slots go to the keystroke invalidation, the leaked setInterval, and the dormant `loadAllAgents` loop. The batch recommendation is present ('the right second read is the batched `useAgentNames` from `clean-list.tsx:7-22` (one request per 100 ids), never one per row') but the severity requirement fails."
+              },
+              {
+                "text": "audit.md flags refetchInterval inside src/lib/use-billing-summary.ts, explains that each calling component runs its own timer so the endpoint is polled once per mounted caller, and recommends a single owner for the poll",
+                "passed": true,
+                "evidence": "Finding 7 (P2): '`src/lib/use-billing-summary.ts:18` - a poll inside a hook with two consumers ... `BillingBanner` and `BillingSettings` both call the hook, so there are two observers each owning a 60 s `setInterval`.' Explains stacking: 'Any consumer that mounts later or passes a different interval adds its own cadence ... removes the \"every new consumer is a poller\" trap.' Fix: 'let the one surface that needs freshness own the interval' with billing-banner as 'the only poller' and billing-settings reading without an interval. Severity downgraded to P2 but stacking explained and one owner recommended, which the grading note allows."
+              },
+              {
+                "text": "audit.md ranks the bare invalidateQueries() in src/components/search-box.tsx onChange handler as P0 or the highest severity, because it refetches every mounted query on every keystroke",
+                "passed": true,
+                "evidence": "'### 1. P0 - `src/components/search-box.tsx:13` - blanket invalidation on every keystroke ... No filter, so every query in the cache is marked invalidated and every active one refetches: the agent list, every `AgentRow` detail, the billing summary, the names batch'. Listed first; P0 is the top severity used."
+              },
+              {
+                "text": "audit.md flags that the QueryClient in src/main.tsx sets no default staleTime (so it is 0) and recommends a default",
+                "passed": true,
+                "evidence": "'### 5. P1 - `src/main.tsx:7` - a `QueryClient` with no defaults ... v5 defaults are `staleTime: 0`, `retry: 3` ... With `staleTime: 0` every query that does not set its own is stale the instant it resolves'. Fix: code block with `defaultOptions.queries.staleTime: 60_000` and a retry predicate."
+              },
+              {
+                "text": "audit.md flags staleTime: 0 in src/components/agent-list.tsx, the useEffect fetch and the never-cleared setInterval in src/components/legacy-panel.tsx, and at least two of: the sequential awaits, the unbounded Promise.all, the limit 1000 fetch-all loop in src/lib/loaders.ts",
+                "passed": true,
+                "evidence": "Finding 6: 'P1 - `src/components/agent-list.tsx:12` - explicit `staleTime: 0` on the list'. Finding 2: 'P0 - `src/components/legacy-panel.tsx:19-23` - a `setInterval` that is never cleared, plus a duplicate first fetch at 12-16 ... The first effect (lines 12-16) is a hand-written fetch outside React Query'. Loaders: finding 3 (`loaders.ts:22-32` limit 1000 loop), finding 10 (`loaders.ts:16-19` `Promise.all` no ceiling), finding 11 (`loaders.ts:9-13` sequential awaits). All three flagged."
+              },
+              {
+                "text": "audit.md explicitly lists src/components/clean-list.tsx (CleanList / useAgentNames) as a non-finding or as correct, and does not recommend changing it",
+                "passed": true,
+                "evidence": "'## Leave alone' lists `clean-list.tsx:33-34` ('This is the shape every poll in the app should have'), `clean-list.tsx:7-22` ('Keep it; finding 12 is a tweak, not a rewrite'), and `clean-list.tsx:39` ('Not a request problem'). Caveat: finding 12 (P3) names `clean-list.tsx:8-9` in its header and suggests sorting ids before chunking, explicitly deferred ('Not worth doing until the list is large enough to notice'); it does not flag CleanList as a load defect, which is what the assertion guards against."
+              },
+              {
+                "text": "audit.md states that no live capture was taken (static-only) and gives deltas as formulas or \"unmeasured\" rather than inventing measured request counts",
+                "passed": true,
+                "evidence": "Opening: 'Static audit of `./sample-app` ... No running app, no capture; every number below is derived from reading the code'. Counts are shown as sums with their terms ('1 billing + 1 agent list + up to 50 agent details + 1 names batch + 1 status = ~54') and tilde-prefixed throughout; 'How to confirm it worked' opens 'With no capture available'. Weakness: never uses the word 'unmeasured', and finding 2 says 'what you measured locally is already 2x' as if a measurement existed, but no count is presented as measured."
+              },
+              {
+                "text": "audit.md has a ranked findings table with severities and file:line references, plus a non-findings section and a limits section",
+                "passed": false,
+                "evidence": "No findings table: findings are thirteen numbered '###' headings (severity and file:line in the heading text). The only tables are 'What one session costs today' (Trigger/Requests/Source, no severity column) and the before/after confirmation table. '## Leave alone' exists as the non-findings section. There is no limits section; the closest is '## Out of scope, noted in passing' (three unrelated observations) and the static-only sentence in the intro."
+              }
+            ]
+          }
+        },
+        {
+          "case": "analyzes-har-capture",
+          "description": "HAR analysis: capture only, no source tree",
+          "with_skill": {
+            "passed": 8,
+            "total": 8,
+            "tokens": 181525,
+            "seconds": 418.8,
+            "assertions": [
+              {
+                "text": "analysis.md identifies a burst of 20 reads on the agent detail endpoint (/registry/v1/artifacts/agent/{id}) as one read per row and recommends replacing them with a batch read keyed on the id set",
+                "passed": true,
+                "evidence": "Finding 1: \"20 x GET /api/v1/agents/agent_01HZXK3M9Q8R2T4V6W8Y0A1B00 ... B19, one started every 20 ms\"; cause \"a row-level component on home runs a per-id read, or a parent fans out Promise.all(ids.map(get))\"; fix \"Home should use the same id-filter read the library already issues (one query per id set, chunked ...)\". Timings match the HAR (0.500 to 0.880 start, 150 ms each)."
+              },
+              {
+                "text": "analysis.md states that GET /v1/billing/summary is polled by two interleaved timers (about 60 s each, roughly 30 s effective) and recommends keeping a single poller",
+                "passed": true,
+                "evidence": "Finding 2: \"Reads at 10:00:01, 10:00:21, 10:01:01 ... Two clocks, each on a 60 s period, 20 s apart. 8 reads in 200 s; one clock would be 4.\" Fix: \"single poller. One always-mounted owner (the shell) carries the interval; every other reader uses the same key with no interval\". Timestamps match the HAR. The 30 s effective figure is in capture.md (Effective ms 30000) rather than analysis.md, but the two-60 s-timer reading and the single-poller fix are explicit."
+              },
+              {
+                "text": "analysis.md identifies that GET /registry/v1/workspaces was requested three times within about two seconds, with at least two overlapping in flight",
+                "passed": true,
+                "evidence": "Finding 3: \"/api/v1/workspaces?limit=100 read 3 times in 500 ms on boot, two of them in flight at once ... 10:00:00.400 (ends .600), 10:00:00.450 (ends .650), 10:00:00.900 (ends 1.100)\". Matches the HAR exactly."
+              },
+              {
+                "text": "analysis.md identifies the serial chain /v1/me -> /v1/orgs -> /v1/orgs/{id}/settings -> /v1/flags and recommends starting the independent ones together, with a note that independence must be confirmed in code",
+                "passed": true,
+                "evidence": "Finding 6: \"/v1/me 0 to 120 ms, /v1/orgs 130 to 230, /v1/orgs/{id}/settings 240 to 320, /v1/flags 330 to 390, /api/v1/workspaces 400 to 600. Each starts 10 ms after the previous ends\"; fix \"Parallel start. Start me and orgs together; start settings, flags and workspaces together as soon as the org id exists\"; \"Dependencies need confirming in code\" and Limits: \"The 320 ms figure assumes me and orgs are independent; confirm before claiming it.\""
+              },
+              {
+                "text": "analysis.md identifies the 404 on /eval/v1/datasets/{id} repeated four times as retry waste on a read that cannot succeed",
+                "passed": true,
+                "evidence": "Finding 5: \"GET /api/v1/datasets/01HZXK3M9Q8R2T4V6W8Y0A1BQQ at 10:00:01.2, 02.3, 03.4, 04.5, every one a 404 ... either a fixed retryDelay or a 1 s poll that does not stop on error ... both repeat a read that cannot succeed.\" Fix: retry on 5xx/network only. Delta \"4 -> 1 per failing read\"."
+              },
+              {
+                "text": "analysis.md does not count the POST /v1/search request with a different body as a duplicate (it may note the two same-body POSTs as a duplicate)",
+                "passed": true,
+                "evidence": "Finding 4: \"A third POST at 10:00:03.300 has {\\\"q\\\": \\\"lineage\\\", \\\"limit\\\": 40}: a different body, so a different read, not a duplicate\"; Non-findings table: \"Third POST /v1/search (limit: 40) | Different body from the other two, so a different read. Not counted as a duplicate\". The two identical-body POSTs are reported as the duplicate (2 -> 1)."
+              },
+              {
+                "text": "analysis.md reports the API request count excluding static assets (49 API requests, or states that static assets were excluded from the count)",
+                "passed": true,
+                "evidence": "Scope table: \"52 entries, 49 API after dropping 3 static assets\"; Non-findings: \"Static assets | 3 (JS 250 KB, CSS 40 KB, one woff2 60 KB) excluded from every count\". Matches ground truth."
+              },
+              {
+                "text": "analysis.md says explicitly what could not be concluded without the source tree",
+                "passed": true,
+                "evidence": "Limits section: \"No source tree, so: no file:line, no query key names, no hook names, no confirmed data library, no QueryClient defaults, no static scan. Every cause above is the most likely explanation for the measured shape and is labelled 'inferred'.\" Plus per-finding ambiguities the capture cannot resolve (key drift vs dependent key vs bare fetch; fixed-delay retry vs 1 s poll; per-row hook vs Promise.all)."
+              }
+            ]
+          },
+          "without_skill": {
+            "passed": 7,
+            "total": 8,
+            "tokens": 169898,
+            "seconds": 395.5,
+            "assertions": [
+              {
+                "text": "analysis.md identifies a burst of 20 reads on the agent detail endpoint (/registry/v1/artifacts/agent/{id}) as one read per row and recommends replacing them with a batch read keyed on the id set",
+                "passed": true,
+                "evidence": "Finding 1: \"From t+0.500 to t+0.880 the home page issues GET /api/v1/agents/agent_...B00 through ...B19, one every 20ms, 150ms each\"; \"the signature of a useQuery inside each card or row\"; change: \"one query keyed on the sorted id list, backed by the ?ids= list call the library already uses\". Timings match the HAR."
+              },
+              {
+                "text": "analysis.md states that GET /v1/billing/summary is polled by two interleaved timers (about 60 s each, roughly 30 s effective) and recommends keeping a single poller",
+                "passed": true,
+                "evidence": "Finding 4: \"GET /v1/billing/summary at 0:01, 0:21, 1:01, 1:21, 2:01, 2:21, 3:01, 3:21. The gaps alternate 20s, 40s ... two independent 60s intervals that started 20s apart\". Change leads with no interval at all, then: \"If a live figure is a requirement, define a single refetchInterval at the key level (not per component)\". Single poller is the fallback, not the primary recommendation, but it is stated."
+              },
+              {
+                "text": "analysis.md identifies that GET /registry/v1/workspaces was requested three times within about two seconds, with at least two overlapping in flight",
+                "passed": true,
+                "evidence": "Finding 3: \"GET /api/v1/workspaces?limit=100 at t+0.400, again at t+0.450 while the first is still in flight, and again at t+0.900, 300ms after the first response.\" Headline says \"three times in 700ms\" (start-to-end span); matches the HAR."
+              },
+              {
+                "text": "analysis.md identifies the serial chain /v1/me -> /v1/orgs -> /v1/orgs/{id}/settings -> /v1/flags and recommends starting the independent ones together, with a note that independence must be confirmed in code",
+                "passed": true,
+                "evidence": "Finding 2: \"/v1/me 0.000-0.120, /v1/orgs 0.130-0.230, /v1/orgs/{id}/settings 0.240-0.320, /v1/flags 0.330-0.390 ... Each starts 10ms after the previous response\"; change: \"Wave 1: me and orgs together ... Check whether flags and settings really need the org id; if they are token-scoped they belong in wave 1.\" The check note exists, though 'me and orgs are independent' is stated flatly rather than as something to confirm."
+              },
+              {
+                "text": "analysis.md identifies the 404 on /eval/v1/datasets/{id} repeated four times as retry waste on a read that cannot succeed",
+                "passed": true,
+                "evidence": "Finding 5: \"GET /api/v1/datasets/01HZ...BQQ returns 404 at t+1.2s, t+2.3s, t+3.4s, t+4.5s ... Four identical answers. 3 wasted requests\"; \"Treat a 404 as terminal\"; retry policy \"never a 4xx\"."
+              },
+              {
+                "text": "analysis.md does not count the POST /v1/search request with a different body as a duplicate (it may note the two same-body POSTs as a duplicate)",
+                "passed": true,
+                "evidence": "Finding 6: \"the identical body again at t+3.200 while the first is in flight; {\\\"q\\\":\\\"lineage\\\",\\\"limit\\\":40} at t+3.300 ... The duplicate is a dedup miss ... The limit: 40 request is a page-size bump\". The limit-40 request is classified separately as a page-size step, not a duplicate, though the budget table still counts it as avoidable (search needed 1 of 3)."
+              },
+              {
+                "text": "analysis.md reports the API request count excluding static assets (49 API requests, or states that static assets were excluded from the count)",
+                "passed": true,
+                "evidence": "TL;DR: \"52 requests over 3m21s, 49 of them to the API\"; budget table \"API total | 49\"; static assets listed as a separate row of 3."
+              },
+              {
+                "text": "analysis.md says explicitly what could not be concluded without the source tree",
+                "passed": false,
+                "evidence": "The closing section \"What this capture cannot tell you\" lists capture limits (no headers, no initiators, one visit per route) and asks for a better HAR export; the source tree is never mentioned, and nothing is tied to it. Meanwhile code-level causes are stated as conclusions: \"the signature of a useQuery inside each card or row\", \"these are either two keys for the same endpoint or raw setInterval\", \"a stale persisted id (last-opened dataset, most likely) is being fetched eagerly\", \"me and orgs are independent\". The only hedge is \"I am assuming the data layer is TanStack Query\" and \"strong signals, not proof\" for initiators. That is not an explicit statement of what the source would settle."
+              }
+            ]
+          }
+        },
+        {
+          "case": "clean-app-no-false-positives",
+          "description": "Clean app: must not invent problems",
+          "with_skill": {
+            "passed": 5,
+            "total": 5,
+            "tokens": 164164,
+            "seconds": 384.9,
+            "assertions": [
+              {
+                "text": "audit.md reports no P0 (or \"critical\"/\"high\") findings for tidy-app",
+                "passed": true,
+                "evidence": "Findings table has exactly one row, severity P3. Scope row: 'Static scan | 7 files, 4 query hook call sites, 1 candidate (0 P0 / 0 P1 / 1 P2); ... candidate dropped (see non-findings)'. The scan's one P2 candidate (app.tsx:9 detail-for-label) is explicitly dropped in the non-findings table with a stated reason."
+              },
+              {
+                "text": "audit.md states that the row names come from one batch read (useAgentNames / the names query) and that this is not an N+1 pattern",
+                "passed": true,
+                "evidence": "Non-findings row 'Per-row N+1 on the agent list': 'AgentRow (agent-list.tsx:7-14) has no hook; it renders props. Names come from useAgentNames, which issues one request per chunk of 100 ids, not one per row (use-agent-names.ts:7,17-28). At the page size of 50 (agent-list.tsx:20) that is 1 request.' Finding 1 closes with 'This is not the N+1 the team is describing. It is one fixed request per page, it does not grow'. Line references verified against the fixture."
+              },
+              {
+                "text": "audit.md states that the poll in the agent list stops when nothing is running and lives in one owner, so there is no polling storm",
+                "passed": true,
+                "evidence": "Non-findings 'Polling storm': 'Exactly one refetchInterval in the tree (agent-list.tsx:22). It sits on the useQuery inside AgentList, not in a shared hook, and AgentList is mounted once (app.tsx:15). One observer, one timer.' and 'Always-on poll': 'The interval is a function: 5000 only while some row has status === \"creating\", otherwise false (agent-list.tsx:22). It stops when the data settles. refetchIntervalInBackground is the library default false, so a hidden tab pauses it.' Matches agent-list.tsx:22 exactly."
+              },
+              {
+                "text": "audit.md says the claim of N+1 problems and polling storms is not supported by the code and does not recommend rewriting the data layer",
+                "passed": true,
+                "evidence": "Opening paragraph: 'No N+1 and no polling storm. Nothing in this tree makes a request count that grows with rows, with mounted components, or with time. The data layer does not need a rewrite.' Suggested order of work item 1: 'Do not rewrite the data layer. The claims that motivated the rewrite (N+1, polling storms) do not hold in this tree; the non-findings table carries the file and line for each.'"
+              },
+              {
+                "text": "audit.md names what was checked (defaults such as staleTime and retry, polling, invalidation, parallel loading) and notes that no live capture was taken",
+                "passed": true,
+                "evidence": "Scope table 'Defaults | staleTime 60 s, gcTime 10 min, retry: none on 4xx except 408/429, otherwise 2 retries; focus refetch on ... main.tsx:6-18' and 'Captures | none - no running app, no HAR'. The Non-findings table enumerates 20 named checks including default-stale-zero, retry-policy, shared-poll-timer, always-on-poll, hand-rolled-poll, broad-invalidation, and serial-awaits (which cites loaders.ts:9-12 Promise.all and the two parallel useQuery calls at app.tsx:9-10). Limits: 'Static only. No capture and no running app, so every count above is a formula with the inputs named, and the Measured column reads \"unmeasured\".'"
+              }
+            ]
+          },
+          "without_skill": {
+            "passed": 5,
+            "total": 5,
+            "tokens": 126724,
+            "seconds": 186.1,
+            "assertions": [
+              {
+                "text": "audit.md reports no P0 (or \"critical\"/\"high\") findings for tidy-app",
+                "passed": true,
+                "evidence": "No finding in the report carries a P0, critical, or high label; the report uses no severity scale at all. The two items it raises are framed as minor: 'two small fixes in one component (agent-list.tsx), and one of them is a real but bounded staleness bug, not a volume problem' and 'Not N+1, not expensive, but the request buys nothing here'. Passes on the absence of any high-severity claim, not on an explicit severity ranking."
+              },
+              {
+                "text": "audit.md states that the row names come from one batch read (useAgentNames / the names query) and that this is not an N+1 pattern",
+                "passed": true,
+                "evidence": "Section 'Claim 1: N+1 - not supported': 'The only list in the app is AgentList, and the only per-row data it needs is the display name. That is served by useAgentNames (src/lib/use-agent-names.ts), which ... chunks them 100 at a time (line 19) and issues one listAgentNames request per chunk through useQueries (lines 22-28) ... With the list capped at limit: 50 (agent-list.tsx line 20) that is exactly one request for the whole list, never fifty.' Also 'AgentRow (agent-list.tsx lines 7-14) is a pure render; it issues no query.' Line numbers verified against the fixture."
+              },
+              {
+                "text": "audit.md states that the poll in the agent list stops when nothing is running and lives in one owner, so there is no polling storm",
+                "passed": true,
+                "evidence": "Section 'Claim 2: polling storm - not supported': 'There is one refetchInterval in the codebase (agent-list.tsx line 22)' ... 'the moment no agent is creating, it returns false and polling stops' ... 'It lives on one query (agentKeys.list(orgId)), and AgentList is mounted once (app.tsx line 15 renders it for orgs[0] only), so there is one observer and at most one list request per 5 s.' Also 'refetchIntervalInBackground is not set, so ... the interval pauses while the tab is hidden.'"
+              },
+              {
+                "text": "audit.md says the claim of N+1 problems and polling storms is not supported by the code and does not recommend rewriting the data layer",
+                "passed": true,
+                "evidence": "TL;DR: 'The N+1 and polling-storm claims are not supported by the code. ... Do not rewrite the data layer; there are two small fixes in one component'. Section 'Verdict on the rewrite': 'Not justified. The layer is ~100 lines and uses the patterns a rewrite would reach for ... A rewrite would spend the effort re-deriving the same structure and would likely reintroduce the one bug it has'."
+              },
+              {
+                "text": "audit.md names what was checked (defaults such as staleTime and retry, polling, invalidation, parallel loading) and notes that no live capture was taken",
+                "passed": true,
+                "evidence": "Opening: 'No running app, no network capture; every claim below is traced to a line in the source.' and closing section 'What would change this read: This is static.' Defaults: 'The global defaults in main.tsx (staleTime: 60_000, gcTime: 10 min, no default refetchInterval) do not introduce one.' Retry: 'Retries are bounded too: 4xx other than 408/429 are not retried, everything else retries at most twice (main.tsx lines 11-15).' Polling: the whole Claim 2 section. Invalidation: 'Rename: one PATCH, then one list refetch via invalidateQueries' plus the four-step trace in fix 2 showing the names key is not invalidated. Parallel loading: 'loadShell starts both with Promise.all, and the two useQuery calls in App mount together either way'. The checks are woven into the prose rather than listed as an explicit checklist, but each named item is present."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "iteration-2",
+      "date": "2026-11-04",
+      "model": "Claude Opus 5.5",
+      "runs_per_configuration": 1,
+      "totals": {
+        "with_skill": {
+          "passed": 28,
+          "total": 29,
+          "rate": 0.966,
+          "mean_tokens": 189964,
+          "mean_seconds": 425.1
+        },
+        "without_skill": {
+          "passed": 20,
+          "total": 29,
+          "rate": 0.69,
+          "mean_tokens": 147169,
+          "mean_seconds": 284.2
+        }
+      },
+      "cases": [
+        {
+          "case": "audits-react-query-app",
+          "description": "App audit: planted issues, file routes, a lazily loaded flag-gated dialog",
+          "with_skill": {
+            "passed": 11,
+            "total": 11,
+            "tokens": 199764,
+            "seconds": 464.1,
+            "assertions": [
+              {
+                "text": "audit.md names the per-row query in src/components/agent-row.tsx as a top-severity (P0) finding and recommends one batch read keyed on the set of ids instead of one read per row",
+                "passed": true,
+                "evidence": "Findings table row 2: 'P0 | AgentRow reads the whole agent, one request per row ... | Batch names projection (or pass the name from the list)'. Section 2 cites agent-row.tsx:12-15 and agent-list.tsx:22-24. The fix is to pass agent.name from the list, 'Otherwise call useAgentNames(ids) once in AgentList' (chunked ?ids= batch)."
+              },
+              {
+                "text": "audit.md flags refetchInterval inside src/lib/use-billing-summary.ts, states correctly how TanStack Query v5 treats several observers of one key (their intervals restart on every query update, so they fire together and share one fetch; the rate is the shortest interval, not one fetch per caller), and recommends a single owner for the poll",
+                "passed": true,
+                "evidence": "Finding 6 cites use-billing-summary.ts:13-20: 'TanStack restarts every observer's interval on each query update (queryObserver.ts:715-720 ...), and the fetches share the in-flight promise, so the endpoint sees **one** fetch per 60 s, not two.' Non-findings repeat it: 'Finding 6 is about ownership and idle polling, not a doubled rate'. Fix: 'single poller. Keep refetchInterval only in the always-mounted owner'. It never states the shortest-interval rule for unequal intervals outright, but the same-key re-sync semantics are correct."
+              },
+              {
+                "text": "audit.md ranks the bare invalidateQueries() in src/components/search-box.tsx onChange handler as P0 or the highest severity, because it refetches every mounted query on every keystroke",
+                "passed": true,
+                "evidence": "Finding 1, P0, ranked first: 'Every keystroke in the search box invalidates and refetches every mounted query', evidence search-box.tsx:10-14, (R + 3) reads per keystroke, plus the cancelRefetch / no-abort-signal detail."
+              },
+              {
+                "text": "audit.md flags that the QueryClient in src/main.tsx sets no default staleTime (so it is 0) and recommends a default",
+                "passed": true,
+                "evidence": "Finding 4: 'src/main.tsx:7 (new QueryClient(), no defaultOptions)'. Freshness table: 'Client default floor | 0 | 30 s'."
+              },
+              {
+                "text": "audit.md flags staleTime: 0 in src/components/agent-list.tsx, the useEffect fetch and the never-cleared setInterval in src/components/legacy-panel.tsx, and at least two of: the sequential awaits, the unbounded Promise.all, the limit 1000 fetch-all loop in src/lib/loaders.ts",
+                "passed": true,
+                "evidence": "Finding 4: 'agent-list.tsx:17 (staleTime: 0 set explicitly...)'. Finding 3: setInterval at legacy-panel.tsx:19-23 with no cleanup, plus 'legacy-panel.tsx:12-16 fetches the same URL once more on mount'. Latent section covers all three loaders.ts items: unbounded Promise.all (:16-19), limit 1000 walk (:22-31), serial awaits in loadHome (:9-13)."
+              },
+              {
+                "text": "audit.md explicitly lists src/components/clean-list.tsx (CleanList / useAgentNames) as a non-finding or as correct, and does not recommend changing it",
+                "passed": true,
+                "evidence": "The non-findings table lists CleanList's poll ('Data-driven interval ... This is the pattern findings 6 and 7 should copy'), CleanList's invalidate on click ('Narrow ... 1 read per click') and useAgentNames ('Batch names projection: chunks of 100, 5 min staleTime'). It recommends no change to clean-list.tsx."
+              },
+              {
+                "text": "audit.md states that no live capture was taken (static-only) and gives deltas as formulas or \"unmeasured\" rather than inventing measured request counts",
+                "passed": true,
+                "evidence": "Opening paragraph: '**This is a static-only audit.** There was no running app and no capture, so every count below is computed from the code and marked \"unmeasured\".' The budget table gives formulas ('billing 1 + list 1 + agent details R + names ceil(R/100) + status 1'), and each finding's Measured column reads 'unmeasured; ...'."
+              },
+              {
+                "text": "audit.md has a ranked findings table with severities and file:line references, plus a non-findings section and a limits section",
+                "passed": true,
+                "evidence": "The '## Findings' table is ranked 1-8 with a Severity column (P0..P3). File:line refs sit in each finding's 'Evidence:' line (e.g. search-box.tsx:10-14, agent-row.tsx:12-15), not in a table column, which follows the skill's report template. Sections '## Non-findings (leave these alone)' and '## Limits' are present."
+              },
+              {
+                "text": "audit.md has a coverage section that lists the routes (/, /settings/billing, /agents/$agentId and the root layout), names the lazily loaded AgentDetailsDialog and its flag gate, and says these were read in code only because no capture was taken",
+                "passed": true,
+                "evidence": "'## Coverage' table: 'Routes (4 file routes + the main.tsx entry) | 5 | none'. Below it: 'src/routes/__root.tsx, index.tsx, agents.$agentId.tsx and settings.billing.tsx define file routes'. 'Lazy chunks with reads | 1 (agent-details-dialog.tsx, from agent-list.tsx:9)'; 'Gated data modules | 1 (same chunk, flag agent-run-history)'. The 'Exercised in a capture' column reads 'none', plus 'Not exercised, and why: everything, because there was no app to run.' Limits: 'The lazy, flag-gated dialog chunk and the unmounted route tree were read only.'"
+              },
+              {
+                "text": "audit.md flags the unconditional refetchInterval of 10 s in src/components/agent-details-dialog.tsx (in the lazily loaded, flag-gated dialog) and recommends a data-driven interval or stopping the poll when the dialog has what it needs",
+                "passed": true,
+                "evidence": "Finding 7 (P2), agent-details-dialog.tsx:9-14: 'refetchInterval: 10_000 ... gated by enabled: showRuns'. Fix: 'data-driven interval, refetchInterval: (q) => (q.state.data?.items.some(isActiveRun) ? 10_000 : false)'. Labelled 'in a lazy, flag-gated chunk' and latent because the dialog cannot open."
+              },
+              {
+                "text": "audit.md identifies that names-a.tsx, names-b.tsx and src/lib/loaders.ts are not reached from any route or entry, and either labels findings in them as dormant code or reports them separately from live findings",
+                "passed": true,
+                "evidence": "Separate section '### Latent: code with no importer at this revision (no requests today)' covers src/lib/loaders.ts and names-a.tsx / names-b.tsx. The Coverage table also lists 'Data modules no route reaches | 3'."
+              }
+            ]
+          },
+          "without_skill": {
+            "passed": 8,
+            "total": 11,
+            "tokens": 156518,
+            "seconds": 340.3,
+            "assertions": [
+              {
+                "text": "audit.md names the per-row query in src/components/agent-row.tsx as a top-severity (P0) finding and recommends one batch read keyed on the set of ids instead of one read per row",
+                "passed": true,
+                "evidence": "Item 3 sits under '### P0 - biggest multipliers': 'N+1 per-row fetch to print a name - agent-row.tsx:12-15, rendered from agent-list.tsx:22-24'. The main fix passes the list item down. The fallback: 'If they don't, use useAgentNames(ids) from clean-list.tsx:7-22 (one request per 100 rows) rather than per-row GETs.'"
+              },
+              {
+                "text": "audit.md flags refetchInterval inside src/lib/use-billing-summary.ts, states correctly how TanStack Query v5 treats several observers of one key (their intervals restart on every query update, so they fire together and share one fetch; the rate is the shortest interval, not one fetch per caller), and recommends a single owner for the poll",
+                "passed": true,
+                "evidence": "Item 8, use-billing-summary.ts:18: 'Two consumers with equal intervals do **not** double the rate in this version. QueryObserver.onQueryUpdate resets every observer's interval timer after each fetch (queryObserver.ts:715-720), so the banner and settings re-sync and dedupe ... if any consumer ever passes a shorter interval, every consumer gets that rate.' Fix: 'make polling opt-in and give it a single owner.'"
+              },
+              {
+                "text": "audit.md ranks the bare invalidateQueries() in src/components/search-box.tsx onChange handler as P0 or the highest severity, because it refetches every mounted query on every keystroke",
+                "passed": true,
+                "evidence": "Item 1 is first under P0: 'Blanket invalidation on every keystroke - search-box.tsx:13 ... refetches every active one ... about 53 requests per character'."
+              },
+              {
+                "text": "audit.md flags that the QueryClient in src/main.tsx sets no default staleTime (so it is 0) and recommends a default",
+                "passed": true,
+                "evidence": "Item 4 (P1): 'new QueryClient() keeps the v5 defaults: staleTime 0 ...'. The fix code sets 'staleTime: 30_000' in defaultOptions."
+              },
+              {
+                "text": "audit.md flags staleTime: 0 in src/components/agent-list.tsx, the useEffect fetch and the never-cleared setInterval in src/components/legacy-panel.tsx, and at least two of: the sequential awaits, the unbounded Promise.all, the limit 1000 fetch-all loop in src/lib/loaders.ts",
+                "passed": true,
+                "evidence": "Item 4: 'Delete staleTime: 0 at agent-list.tsx:17'. Item 2: 'Leaked 5 s poll plus a duplicate raw fetch - legacy-panel.tsx:12-23'. Item 10 covers loadAllAgents at limit 1000, loadAgentDetails with no ceiling, and loadHome's serial awaits."
+              },
+              {
+                "text": "audit.md explicitly lists src/components/clean-list.tsx (CleanList / useAgentNames) as a non-finding or as correct, and does not recommend changing it",
+                "passed": false,
+                "evidence": "'Leave these alone' lists the conditional poll and the batched name read, but item 11 (P3) is 'Any click refetches the list - clean-list.tsx:39 ... move it to an explicit refresh control. Otherwise remove it.' Scope also says 'One file marked clean still has a finding (item 11)'. The report recommends changing clean-list.tsx."
+              },
+              {
+                "text": "audit.md states that no live capture was taken (static-only) and gives deltas as formulas or \"unmeasured\" rather than inventing measured request counts",
+                "passed": true,
+                "evidence": "Scope: 'Static audit only. There is no running app and no capture, so every number below is an estimate from reading the code. It assumes a 50-row agent list'. Counts appear as '~54 (billing 1, list 1, rows 50, names 1, status 1)', which are estimates with their breakdown, not measured counts. It never uses 'unmeasured' per number, which makes it weaker than the other run, but it invents no measurements."
+              },
+              {
+                "text": "audit.md has a ranked findings table with severities and file:line references, plus a non-findings section and a limits section",
+                "passed": false,
+                "evidence": "No findings table. Findings are numbered prose items under P0/P1/P2/P3 headings. The only tables are the 'Request inventory' (sites, no severity) and 'Estimated impact'. 'Leave these alone' and 'Not verified from a static read' do give the non-findings and limits sections."
+              },
+              {
+                "text": "audit.md has a coverage section that lists the routes (/, /settings/billing, /agents/$agentId and the root layout), names the lazily loaded AgentDetailsDialog and its flag gate, and says these were read in code only because no capture was taken",
+                "passed": false,
+                "evidence": "No coverage section. Scope only says 'src/routes/* is not mounted from this entry point', without listing the routes. The lazy dialog and its flag appear only inside finding item 6 ('the dialog code is lazy-loaded (agent-list.tsx:9)'). The case instructions say that alone fails this assertion."
+              },
+              {
+                "text": "audit.md flags the unconditional refetchInterval of 10 s in src/components/agent-details-dialog.tsx (in the lazily loaded, flag-gated dialog) and recommends a data-driven interval or stopping the poll when the dialog has what it needs",
+                "passed": true,
+                "evidence": "Item 6 (P2): 'Unconditional 10 s poll on run history - agent-details-dialog.tsx:12', which notes the flag (flags.ts:1) and the lazy load. Fix: 'refetchInterval: (query) => (query.state.data?.items.some(isRunInProgress) ? 10_000 : false)'."
+              },
+              {
+                "text": "audit.md identifies that names-a.tsx, names-b.tsx and src/lib/loaders.ts are not reached from any route or entry, and either labels findings in them as dormant code or reports them separately from live findings",
+                "passed": true,
+                "evidence": "Section '### P3 - latent or dead code; fix before wiring it up'. Item 9: 'Neither component is imported anywhere today, so the load is zero now.' Item 10: 'Nothing imports this file, so there's no load today.' The inventory table marks them 'Not mounted anywhere' and 'Not imported anywhere'."
+              }
+            ]
+          }
+        },
+        {
+          "case": "analyzes-har-capture",
+          "description": "HAR analysis: capture only, no source tree",
+          "with_skill": {
+            "passed": 10,
+            "total": 11,
+            "tokens": 194469,
+            "seconds": 475.9,
+            "assertions": [
+              {
+                "text": "analysis.md identifies a burst of 20 reads on the agent detail endpoint (/api/v1/agents/{id}) as one read per row and recommends replacing them with a batch read keyed on the id set",
+                "passed": true,
+                "evidence": "Finding 1: '20 x GET /api/v1/agents/agent_...B00 through ...B19 ... one every 20 ms'; Likely cause 'Home renders one row component per agent, and each row reads its own agent by id'; fix 'Home reads its ids with the same hook and the same key the library uses for ?ids=' with queryKey ['agents','by-ids',[...ids].sort()]."
+              },
+              {
+                "text": "analysis.md states that GET /v1/billing/summary is polled by two interleaved timers (about 60 s each, roughly 30 s effective) and recommends keeping a single poller",
+                "passed": true,
+                "evidence": "Finding 2: 'two clocks of exactly 60 s each: A at 1.3, 61.3 ... and B at 21.3, 81.3 ...'; 'timers 2, effective period 30 s'; 'Fix: single poller. The shell owns the 60 s poll.'"
+              },
+              {
+                "text": "analysis.md identifies that GET /api/v1/workspaces was requested three times within about two seconds, with at least two overlapping in flight",
+                "passed": true,
+                "evidence": "Finding 4: 'fetched 3 times on home within 500 ms' (0.700-0.900, 0.750-0.950, 1.200-1.400 s); 'Copies 1 and 2 were in flight at the same time'."
+              },
+              {
+                "text": "analysis.md identifies the serial chain /v1/me -> /v1/orgs -> /v1/orgs/{id}/settings -> /v1/flags and recommends starting the independent ones together, with a note that independence must be confirmed in code",
+                "passed": true,
+                "evidence": "Finding 6 table of the four reads, each starting 10 ms after the previous ends; 'Start /v1/me, /v1/orgs and /v1/flags together'; 'Confirm in code. Check the arguments each boot read takes. Check for a side effect that forces an order'."
+              },
+              {
+                "text": "analysis.md identifies the 404 on /api/v1/datasets/{id} repeated four times as retry waste on a read that cannot succeed",
+                "passed": true,
+                "evidence": "Finding 3: 'returned 404 four times: at 1.5, 2.6, 3.7 and 4.8 s'; 'This is 1 attempt + 3 retries of a read that cannot succeed'; fix 'Retry on 5xx and network errors only'."
+              },
+              {
+                "text": "analysis.md does not count the POST /v1/search request with a different body as a duplicate (it may note the two same-body POSTs as a duplicate)",
+                "passed": true,
+                "evidence": "Non-findings: 'Third search request (limit: 40) | Different body from the first two, so it is not counted as a byte duplicate'; totals subtract only '1 (search duplicate)'."
+              },
+              {
+                "text": "analysis.md reports the API request count excluding static assets (49 API requests, or states that static assets were excluded from the count)",
+                "passed": true,
+                "evidence": "'The capture holds 49 API requests over 201 s'; scope table '52 entries: 49 API, 3 static (one JS bundle, one CSS file, one font)'."
+              },
+              {
+                "text": "analysis.md says explicitly what could not be concluded without the source tree",
+                "passed": true,
+                "evidence": "Opening: 'No source tree was available ... every cause is inferred ... Confirm each cause in code'; Limits: 'No source tree. No static scan and no coverage map were run. Every \"Likely cause\" is a hypothesis ... The data library and its defaults are unknown'; Coverage table rows 'Read in code: not available'."
+              },
+              {
+                "text": "analysis.md attributes each request to the page the capture labels it with (pageref), and does not claim a request happened with \"nothing asking for it\" or \"no surface in use\" when the capture labels a page for it",
+                "passed": true,
+                "evidence": "Requests are named by label ('labeled evals', 'on search', 'Requests labeled evals (4), jobs (5), search (3) and reports (1)'). The off-route possibility is kept conditional in Open question 1 ('If that is right ... If you did open those screens, ignore this item') and export is a question ('Is /v1/export meant to run without a user action?'). No flat 'nothing asked for it' claim. It does argue the labels are not route evidence because all seven pages share one start time."
+              },
+              {
+                "text": "analysis.md labels mechanisms it cannot see in a capture (which cache key, which hook, whether two requests are independent, what a value means to the product) as inferences or open questions, not as facts",
+                "passed": false,
+                "evidence": "Mostly well hedged (correct TanStack reasoning that same-key observers would restart intervals, 'Likely cause' and 'Confirm in code' per finding). But under 'What it shows' in finding 1 it states a cache-key mechanism as fact: 'The library still re-fetches agents that home loaded 450 ms earlier, because the two screens cache them under different keys.' Finding 4 likewise asserts 'Copy 3 is a refetch-on-mount with staleTime: 0, or a remount', and finding 2 'A second consumer started its own 60 s timer'. Narrow failure under a strict reading."
+              },
+              {
+                "text": "analysis.md states which parts of the app a single capture cannot have exercised (routes not visited, lazily loaded dialogs or tabs, flag- or permission-gated screens, error, empty or offline states) and recommends specific further captures or a source-based coverage map to close the gap",
+                "passed": true,
+                "evidence": "Coverage: 'A single session usually misses unvisited routes, unopened dialogs and tabs, flag and role variants, error and empty states, and hidden-tab behaviour'; Limits lists untested states (offline, empty tenant, other roles, writes) and 'Captures that would close these gaps' (HAR with content, hidden 2 min, three window switches, one write, empty tenant, each of evals/jobs/search/reports opened on purpose)."
+              }
+            ]
+          },
+          "without_skill": {
+            "passed": 6,
+            "total": 11,
+            "tokens": 151374,
+            "seconds": 309.1,
+            "assertions": [
+              {
+                "text": "analysis.md identifies a burst of 20 reads on the agent detail endpoint (/api/v1/agents/{id}) as one read per row and recommends replacing them with a batch read keyed on the id set",
+                "passed": true,
+                "evidence": "Finding 1: 'Home issues 20 GET /api/v1/agents/agent_...B00 through ...B19 ... exactly 20 ms apart'; 'Fetch agents once, at the list level, with the batch endpoint ... Rows should not each call a per-id hook'; 'Give the batch query a stable key: sort the ids'."
+              },
+              {
+                "text": "analysis.md states that GET /v1/billing/summary is polled by two interleaved timers (about 60 s each, roughly 30 s effective) and recommends keeping a single poller",
+                "passed": true,
+                "evidence": "Finding 4: 'Split into two series, each one is a clean 60 s period'; '2 calls per minute means 120 per hour per tab, where one poller would make 60'; 'Give the interval a single owner: one hook used by one shell-level component'."
+              },
+              {
+                "text": "analysis.md identifies that GET /api/v1/workspaces was requested three times within about two seconds, with at least two overlapping in flight",
+                "passed": true,
+                "evidence": "Finding 6: 'called at +0.70, +0.75 and +1.20 s. The first two overlap in flight, so they were not deduplicated.'"
+              },
+              {
+                "text": "analysis.md identifies the serial chain /v1/me -> /v1/orgs -> /v1/orgs/{id}/settings -> /v1/flags and recommends starting the independent ones together, with a note that independence must be confirmed in code",
+                "passed": false,
+                "evidence": "Chain and parallel-start fix are present ('Start the independent boot reads together, for example with Promise.all'). The caveat is only 'They could still depend on a header I can't see' and 'medium on what can be parallelized'; it never says to confirm independence in code, and it asserts 'Start settings and workspaces as soon as orgs resolves' without a code check."
+              },
+              {
+                "text": "analysis.md identifies the 404 on /api/v1/datasets/{id} repeated four times as retry waste on a read that cannot succeed",
+                "passed": true,
+                "evidence": "Finding 5: 'returns 404 four times ... 1 attempt plus 3 retries at a constant delay'; 'A 404 is deterministic, so retrying it only adds 3 wasted calls'."
+              },
+              {
+                "text": "analysis.md does not count the POST /v1/search request with a different body as a duplicate (it may note the two same-body POSTs as a duplicate)",
+                "passed": false,
+                "evidence": "Finding 7 is titled 'Search fires three times for one term' and 'Why it matters' counts '2 extra 300 ms searches', i.e. the limit-40 request is counted as waste alongside the identical one; the TL;DR lists 'search 3x' under 'the same data is requested repeatedly'. The budget table hedges ('2 only if the 40 is real pagination') but the finding itself counts it."
+              },
+              {
+                "text": "analysis.md reports the API request count excluding static assets (49 API requests, or states that static assets were excluded from the count)",
+                "passed": true,
+                "evidence": "'52 requests over 201 s: 3 static assets, 49 API calls'; budget total '49'."
+              },
+              {
+                "text": "analysis.md says explicitly what could not be concluded without the source tree",
+                "passed": false,
+                "evidence": "The report never mentions the missing source tree. Its limits section ('What the capture cannot tell me') attributes every gap to the HAR (no headers, no initiators, placeholder sizes); the closest is 'nothing here is attributed to a file or component. Every \"why\" above is inferred from timing and URLs' and one 'verify in code' line for the job poll. It does not say which conclusions would need the source."
+              },
+              {
+                "text": "analysis.md attributes each request to the page the capture labels it with (pageref), and does not claim a request happened with \"nothing asking for it\" or \"no surface in use\" when the capture labels a page for it",
+                "passed": true,
+                "evidence": "Names the labels ('The capture also labels 13 requests as jobs, evals, search and reports', 'labelled reports') and keeps the off-surface reading conditional ('I can't tell which one it is from the file', open question 1 'If not ...'). It leans ('If you didn't (your description suggests you didn't), the app pays 600 KiB ... on every visit') but stops short of a flat claim."
+              },
+              {
+                "text": "analysis.md labels mechanisms it cannot see in a capture (which cache key, which hook, whether two requests are independent, what a value means to the product) as inferences or open questions, not as facts",
+                "passed": false,
+                "evidence": "Finding 4 states a library mechanism as fact, and it is wrong: 'In TanStack Query, refetchInterval runs per observer ... Two mounted components that each declare refetchInterval: 60_000 produce exactly this alternating pattern.' Same-key observers in v5 restart their intervals on each update and share one fetch, so they would not give two offset clocks. Also stated as fact: 'reference data is treated as instantly stale', 'components fetch for themselves', 'Billing data rarely changes minute to minute'."
+              },
+              {
+                "text": "analysis.md states which parts of the app a single capture cannot have exercised (routes not visited, lazily loaded dialogs or tabs, flag- or permission-gated screens, error, empty or offline states) and recommends specific further captures or a source-based coverage map to close the gap",
+                "passed": false,
+                "evidence": "The limits section covers only what the HAR file lacks (headers, initiators, sizes, provenance). Nothing lists unvisited routes, lazy dialogs or tabs, flag- or role-gated screens, or empty, error or offline states. The only further capture suggested is a post-fix re-capture of the same session for verification, not for coverage."
+              }
+            ]
+          }
+        },
+        {
+          "case": "clean-app-no-false-positives",
+          "description": "Clean app: must not invent problems",
+          "with_skill": {
+            "passed": 7,
+            "total": 7,
+            "tokens": 175660,
+            "seconds": 335.4,
+            "assertions": [
+              {
+                "text": "audit.md reports no P0 (or \"critical\"/\"high\") findings for tidy-app",
+                "passed": true,
+                "evidence": "The Findings table has a single row, '1 | P2 | The list already returns agent names...'. Scope table: 'Static scan ... 1 candidate (P0 0 / P1 0 / P2 1). The candidate was read and dropped'. Nothing is labelled critical or high."
+              },
+              {
+                "text": "audit.md states that the row names come from one batch read (useAgentNames / the names query) and that this is not an N+1 pattern",
+                "passed": true,
+                "evidence": "Claims table, N+1 row, verdict 'Not present': 'Names come from one batched projection chunked at 100 ids (src/lib/use-agent-names.ts:7,17-23). The list is capped at 50 rows ... so the names read is always 1 request, not 1 per row.' Non-findings: 'useQueries maps over chunks of 100 sorted, deduped ids ... not over ids. With a 50-row page that is exactly 1 query.'"
+              },
+              {
+                "text": "audit.md states that the poll in the agent list stops when nothing is running and lives in one owner, so there is no polling storm",
+                "passed": true,
+                "evidence": "Claims table, polling row, verdict 'Not present': 'There is one poll in the whole app (agent-list.tsx:21). Its interval is a function that returns false unless an agent is creating ... has one observer, and pauses when the tab is hidden.' Non-findings 'Poll stacking': 'The app has one interval, on one key, in one client.'"
+              },
+              {
+                "text": "audit.md says the claim of N+1 problems and polling storms is not supported by the code and does not recommend rewriting the data layer",
+                "passed": true,
+                "evidence": "Opening paragraph: 'At this revision the app has no N+1 read and no polling storm, and nothing in it justifies rewriting the data layer.' Claims table: 'The data layer needs a rewrite | Not supported by the code'. Suggested order of work, item 3: 'nothing at this revision points to a data-layer rewrite.'"
+              },
+              {
+                "text": "audit.md names what was checked (defaults such as staleTime and retry, polling, invalidation, parallel loading) and notes that no live capture was taken",
+                "passed": true,
+                "evidence": "The Non-findings table has rows for 'Freshness' (60 s floor, names at 5 min), 'Retry' (5xx/network/408/429, 3 attempts), 'The creation poll', 'Invalidation after rename', and 'Shell reads /v1/me and /v1/orgs' ('Both start in the same render, in parallel'). Scope table: 'Captures | None. No running app, no HAR'."
+              },
+              {
+                "text": "audit.md notes that the list response already carries each agent name, so the separate names read in AgentList is redundant, and that the rename mutation invalidates only the list key so the names cache keeps the old name",
+                "passed": true,
+                "evidence": "Finding 1: 'listAgents returns Page<Agent>, and Agent has name (src/lib/api.ts:1-5,21-22). AgentList drops those names.' Also: 'The rename's onSuccess writes agentKeys.detail, which nothing reads, and invalidates [\"agents\", \"list\", orgId] ... so [\"agents\", \"names\", ...] is untouched.' Consequence 1: 'the row still shows the old one ... until the names entry passes its 5-minute staleTime'."
+              },
+              {
+                "text": "audit.md labels every request count as a formula or \"unmeasured\" rather than a measured fact, and includes an explicit table or list of patterns checked and found absent (non-findings)",
+                "passed": true,
+                "evidence": "Opening: 'every count below comes from the code and is marked unmeasured'. The budget table is headed 'Request budget at this revision (derived from code, unmeasured)', the Findings 'Measured' column reads 'Unmeasured (static only)', the Delta ends 'All unmeasured', and the stuck-poll figure is '720 GETs an hour per tab (unmeasured)'. A '## Non-findings' table lists 15 checked items, including per-row reads, poll stacking, key canonicality, fetch outside the data layer, pagination/fetch-all and persistence."
+              }
+            ]
+          },
+          "without_skill": {
+            "passed": 6,
+            "total": 7,
+            "tokens": 133615,
+            "seconds": 203.3,
+            "assertions": [
+              {
+                "text": "audit.md reports no P0 (or \"critical\"/\"high\") findings for tidy-app",
+                "passed": true,
+                "evidence": "Severities used: '1. Rename does not update the name on screen (bug, medium)', '2. ... (low)', '3. ... (low, functional)', '4. Smaller hygiene items (low)'. Nothing is labelled P0, critical or high."
+              },
+              {
+                "text": "audit.md states that the row names come from one batch read (useAgentNames / the names query) and that this is not an N+1 pattern",
+                "passed": true,
+                "evidence": "'useAgentNames (use-agent-names.ts:10-31) dedupes and sorts the ids, splits them into chunks of 100, and issues one GET ... per chunk. The list is fetched with limit: 50 ..., so this is always exactly one request. That is the batching pattern used to avoid N+1, not an instance of it.'"
+              },
+              {
+                "text": "audit.md states that the poll in the agent list stops when nothing is running and lives in one owner, so there is no polling storm",
+                "passed": true,
+                "evidence": "'\"Polling storms\" - not found. There is exactly one refetchInterval in the codebase (agent-list.tsx:21)... returns false otherwise, so polling stops on the first poll after the agent finishes.' and 'One query key per org, and only one AgentList is ever mounted (first org only, app.tsx:10,14). One poller per tab.'"
+              },
+              {
+                "text": "audit.md says the claim of N+1 problems and polling storms is not supported by the code and does not recommend rewriting the data layer",
+                "passed": true,
+                "evidence": "TL;DR: 'Neither claim holds up ... The data layer is in good shape and does not need a rewrite.' Recommendation: 'Do not rewrite the data layer.'"
+              },
+              {
+                "text": "audit.md names what was checked (defaults such as staleTime and retry, polling, invalidation, parallel loading) and notes that no live capture was taken",
+                "passed": true,
+                "evidence": "'What is already done well': 'Sensible client defaults: 60s staleTime, 10 minute gcTime, and a retry policy that does not hammer on client errors', 'Conditional polling that turns itself off', 'Independent reads run in parallel (/v1/me and /v1/orgs in App, Promise.all in loadShell)'. Invalidation is examined in finding 1. Opening: 'No running app, no network capture, no backend.' Limits: 'Static only. No running app, no HAR, no backend.'"
+              },
+              {
+                "text": "audit.md notes that the list response already carries each agent name, so the separate names read in AgentList is redundant, and that the rename mutation invalidates only the list key so the names cache keeps the old name",
+                "passed": true,
+                "evidence": "Finding 2: 'listAgents returns Page<Agent>, and Agent already carries name. AgentList discards those names and asks for them again by id.' Finding 1: 'invalidates [\"agents\", \"list\", orgId]. Prefix matching does not reach [\"agents\", \"names\", ...] ... the names query is still fresh under its 5 minute staleTime, and nothing refetches it.'"
+              },
+              {
+                "text": "audit.md labels every request count as a formula or \"unmeasured\" rather than a measured fact, and includes an explicit table or list of patterns checked and found absent (non-findings)",
+                "passed": false,
+                "evidence": "The labelling half holds: 'Request counts below are derived from the code and TanStack Query v5 defaults, not measured', the budget is headed 'Request budget (derived from the code)', and Limits says 'Nothing here was measured.' The non-findings half does not. The only patterns stated as absent are the two claimed ones, N+1 and polling, each in its own prose section. 'What is already done well' lists strengths, not an inventory of anti-patterns checked and ruled out. Several checks never appear as checked-and-absent: fetch outside the data layer, focus/reconnect listeners, persistence, and fetch-all loops. This is borderline, but the assertion asks for an explicit list and the evidence is not clear."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

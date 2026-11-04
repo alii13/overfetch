@@ -1,8 +1,18 @@
-# request-audit
+<p align="center">
+  <img src="assets/banner.svg" alt="overfetch: find the requests your frontend doesn't need" width="100%">
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0B1020"></a>
+  <img alt="Python 3.9+, standard library only" src="https://img.shields.io/badge/python-3.9%2B%20%C2%B7%20stdlib%20only-0B1020">
+  <a href="benchmarks/README.md"><img alt="Evals: 97% with the skill, 69% without" src="https://img.shields.io/badge/evals-97%25%20vs%2069%25%20baseline-22C55E"></a>
+</p>
+
+# overfetch
 
 An agent skill that audits how a frontend app talks to its backend and tells you what to fix, in order.
 
-It finds the ways a web app makes more requests than its screens need: one read per row, the same read twice, poll timers that stack, caches that never count as fresh, invalidations that reload the page, requests that run one after another when they could run together, page sizes that fetch everything, and retries that hammer a 404. It ranks them by how the request count grows, backs each with a `file:line` or a capture, and names the fix.
+It finds the ways a web app makes more requests than its screens need: one read per row, the same read twice, poll timers that stack, caches that never count as fresh, invalidations that reload the page, requests that run one after another when they could run together, page sizes that fetch everything, and retries that hammer a 404. It ranks them by how the request count grows, backs each with a `file:line` or a capture, names the fix, and says which parts of the app it exercised and which it only read.
 
 Works with TanStack Query (React Query), SWR, Apollo Client, RTK Query, and apps that call `fetch` by hand.
 
@@ -17,26 +27,44 @@ A markdown report:
 - **Open decisions** and **backend asks**: the parts that are not a client patch.
 - **Contradictions** with existing docs, and **limits** of the audit.
 
-Excerpt from a run against a fixture app:
+Excerpt from the benchmark's static audit of the test fixture (R is the list's row count):
 
-```
-| # | Severity | Finding                                                   | Growth | Measured                 | Fix pattern             | Effort |
-| 1 | P0       | AgentRow fetches each agent to print its name             | rows   | 100 → 1 (fixture, 100)   | Batch names projection  | 2 h    |
-| 2 | P2       | useBillingSummary defines the 60 s poll in a hook 3 callers share | cadence | unmeasured (same key re-syncs) | Single poller      | 1 h    |
-| 3 | P0       | SearchBox invalidates every query on each keystroke       | time   | unmeasured: keys × mounted | Narrow invalidation   | 1 h    |
-```
+| # | Severity | Finding | Growth | Measured | Fix pattern | Effort |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | P0 | Every keystroke in the search box invalidates and refetches every mounted query | keystrokes × mounted queries | unmeasured; R + 3 → 0 per keystroke (53 → 0 at R = 50) | Narrow invalidation (here: delete it) | 0.5 h |
+| 2 | P0 | `AgentRow` reads the whole agent, one request per row, to print its name | rows | unmeasured; R → 0 per list mount | Batch names projection (or pass the name from the list) | 1.5 h |
+| 3 | P0 | `/v1/status` is polled every 5 s by a `setInterval` that is never cleared | mounts × time | unmeasured; 12k reads/min after k mounts | Single poller via a query | 1.5 h |
+| 6 | P2 | Billing summary polls every 60 s forever, defined in a shared hook | time | unmeasured; 60/h per tab (one fetch per interval, not one per caller) | Single poller | 1 h |
+| 7 | P2 | Run history polls every 10 s with no stop (latent: the dialog cannot open today) | time while open | unmeasured; 6/min while open | Data-driven interval | 1 h |
+
+## Benchmarks
+
+Each eval case runs twice: once by an agent told to use the skill, once by an agent with no skill. A separate grader agent checks both reports against fixed assertions and quotes its evidence.
+
+| Case | With overfetch | Without |
+| --- | --- | --- |
+| App audit: planted issues, file routes, a lazily loaded flag-gated dialog | 11 / 11 | 8 / 11 |
+| HAR analysis: capture only, no source tree | 10 / 11 | 6 / 11 |
+| Clean app: must not invent problems | 7 / 7 | 6 / 7 |
+| **All assertions** | **28 / 29 (97%)** | **20 / 29 (69%)** |
+| Mean tokens per run | 190k | 147k |
+| Mean wall time per run | 425 s | 284 s |
+
+Both configurations find the obvious patterns. The skill wins on what the baseline leaves out: a coverage section that names the routes, lazy chunks and gated screens it only read, correct library semantics (same-key TanStack poll timers re-sync and share a fetch; the baseline claimed they stack), causes from a capture labelled as inferences, and an explicit list of what was ruled out.
+
+One run per configuration per case, synthetic fixtures, LLM grading. Method, the earlier iteration, and every assertion with its evidence: [`benchmarks/`](benchmarks/README.md).
 
 ## Install
 
 The skill is a folder. Put it where your agent looks for skills:
 
-- **Claude Code, personal**: `~/.claude/skills/request-audit/`
-- **Claude Code, per project**: `<repo>/.claude/skills/request-audit/`
-- **Codex**: `<repo>/.codex/skills/request-audit/` (or symlink the Claude folder)
+- **Claude Code, personal**: `~/.claude/skills/overfetch/`
+- **Claude Code, per project**: `<repo>/.claude/skills/overfetch/`
+- **Codex**: `<repo>/.codex/skills/overfetch/` (or symlink the Claude folder)
 - Any other agent that reads `SKILL.md`: point it at the folder.
 
 ```bash
-git clone https://github.com/alii13/request-audit ~/.claude/skills/request-audit
+git clone https://github.com/alii13/overfetch ~/.claude/skills/overfetch
 ```
 
 The scripts need Python 3.9+ and nothing else. `scripts/capture.mjs` needs Node 18+ and Playwright installed in the project you are capturing.
@@ -51,7 +79,7 @@ In a Claude Code session inside the app's repo:
 
 > Here's a HAR from the home page (`capture.har`). What's wrong with our request pattern?
 
-The agent runs the static scan, reads the code behind each candidate, captures the running app when it can (or analyses the HAR you give it), and writes the report. Expect 15 to 30 minutes for a static audit of a mid-sized app, more with captures.
+The agent maps the app's surface, runs the static scan, reads the code behind each candidate, captures the running app when it can (or analyses the HAR you give it), and writes the report. Expect 15 to 30 minutes for a static audit of a mid-sized app, more with captures.
 
 You can also run the tools without an agent:
 
@@ -69,12 +97,14 @@ python3 scripts/har_analyze.py capture.har --format md --out capture.md
 node scripts/capture.mjs http://localhost:5173/ capture.har --journey journey.json --idle 180000
 ```
 
+On a 2,156-file React app the coverage map takes about 4 seconds and the scan about 11.
+
 ## What it checks
 
 | Pattern | Detected by | Severity |
 | --- | --- | --- |
 | Query hook inside a row component (N+1) | scan + capture bursts | P0 |
-| Poll interval in a hook several components call (timers stack in SWR/Apollo; re-sync in TanStack, so cadence ownership) | scan + capture `timers: k` | P0 to P2 by library |
+| Poll interval in a hook several components call (timers stack in SWR and Apollo; re-sync in TanStack, so it is cadence ownership) | scan + capture `timers: k` | P0 to P2 by library |
 | Unconditional poll; `setInterval` driving reads; uncleared timers | scan + capture | P0 to P2 |
 | No default `staleTime`; `staleTime: 0`; `"always"` refetch modes | scan + capture duplicates | P1 |
 | Blanket invalidation, especially from input handlers | scan | P0 / P2 |
@@ -85,9 +115,10 @@ node scripts/capture.mjs http://localhost:5173/ capture.har --journey journey.js
 | `Promise.all` fan-out with no ceiling | scan + capture peak in flight | P1 |
 | Keys that differ only by spelling | scan | P2 |
 | Repeated identical 4xx (retry waste) | capture | P1 |
+| Routes, lazy chunks and gated screens no capture exercised | coverage map | reported, not ranked |
 | Hover prefetch, persisted caches, custom focus listeners | scan, recorded as info | info |
 
-The full list, with how each is verified and fixed, is in [`references/catalog.md`](references/catalog.md). Library semantics the audit relies on (per-observer timers, dedup windows, focus throttles) are in [`references/library-facts.md`](references/library-facts.md).
+The full list, with how each is verified and fixed, is in [`references/catalog.md`](references/catalog.md). Library semantics the audit relies on (timer re-sync, dedup windows, focus throttles, retry defaults) are in [`references/library-facts.md`](references/library-facts.md), each with the version it was checked against.
 
 ## How it works
 
@@ -105,7 +136,7 @@ The full list, with how each is verified and fixed, is in [`references/catalog.m
 - A capture from fixture data proves a shape, not production volume.
 - Module-level capture coverage is exact against a dev server; against a production build it relies on chunk names, and code-split chunks named by id cannot be matched.
 - Route detection covers file-based routers and the path literals of code-defined ones; nested relative paths in code-defined routers are not joined.
-- RTK Query's per-entry polling and Apollo's normalized cache change what counts as a finding; the library facts file covers the differences, but the scanner's severities assume per-observer semantics.
+- The scanner picks poll severities from the library it detects in `package.json`; RTK Query's per-entry polling and Apollo's normalized cache are covered in the library facts, not in the scanner's rules.
 
 ## Tests
 
@@ -113,11 +144,11 @@ The full list, with how each is verified and fixed, is in [`references/catalog.m
 python3 -m unittest discover -s scripts/tests -v
 ```
 
-Forty-four tests cover the three Python tools against a fixture app with planted issues (including file routes, a lazily loaded dialog and a flag gate) and a synthetic HAR. Add a fixture file and a test for any new detector.
+Forty-four tests cover the three Python tools against a fixture app with planted issues (file routes, a lazily loaded flag-gated dialog, a shared poll, an uncleared interval) and a synthetic HAR. Add a fixture file and a test for any new detector.
 
 ## Evals
 
-`evals/` holds three cases in the layout `claude plugin eval` reads: an app audit, a HAR analysis, and a clean app that must not produce false positives. Run them with:
+`evals/` holds the three benchmark cases in the layout `claude plugin eval` reads. Run them with:
 
 ```bash
 claude plugin eval . --allow-tools Read,Glob,Grep,Bash,Write --scaffold
@@ -129,6 +160,7 @@ claude plugin eval . --allow-tools Read,Glob,Grep,Bash,Write --scaffold
 - Every fact in `references/library-facts.md` names the library version it was checked against.
 - Keep the scripts on the standard library.
 - Severity changes need a sentence on the growth class that justifies them.
+- A change to `SKILL.md` or the references reruns the evals; post the before and after in the pull request.
 
 ## License
 

@@ -44,7 +44,7 @@ STATIC_EXT_RE = re.compile(
     re.I,
 )
 # Dev-server internals (Vite, webpack-dev-server) and the capture script's own markers.
-DEV_PATH_RE = re.compile(r"/(?:@vite|@id|@fs|@react-refresh|node_modules|__vite_ping|__webpack_hmr|__request-audit__)(?:/|$)")
+DEV_PATH_RE = re.compile(r"/(?:@vite|@id|@fs|@react-refresh|node_modules|__vite_ping|__webpack_hmr|__overfetch__)(?:/|$)")
 STATIC_HOST_RE = re.compile(r"(?:^|\.)(?:fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.|cdnjs\.cloudflare\.com|unpkg\.com|jsdelivr\.net)", re.I)
 ID_SEGMENT_RES = [
     re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I),  # uuid

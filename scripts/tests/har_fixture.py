@@ -71,7 +71,7 @@ def build() -> dict:
     return {
         "log": {
             "version": "1.2",
-            "creator": {"name": "request-audit fixture", "version": "1"},
+            "creator": {"name": "overfetch fixture", "version": "1"},
             "pages": [{"id": p, "title": p, "startedDateTime": BASE.isoformat(), "pageTimings": {}}
                       for p in ("home", "library", "shell", "jobs", "evals", "search", "reports")],
             "entries": entries,

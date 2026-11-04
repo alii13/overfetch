@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="t d">
+  <title id="t">overfetch</title>
+  <desc id="d">overfetch finds the requests your frontend does not need. A request waterfall shows 21 requests before and 2 after.</desc>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#FFFFFF" stroke-opacity="0.035"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.82" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="#1D4ED8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#1D4ED8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="400" rx="24" fill="#0B1020"/>
+  <rect width="1280" height="400" rx="24" fill="url(#grid)"/>
+  <rect width="1280" height="400" rx="24" fill="url(#glow)"/>
+
+  <text x="72" y="118" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" letter-spacing="3" fill="#7DD3FC">AGENT SKILL</text>
+  <text x="68" y="204" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="88" font-weight="700" fill="#F8FAFC">overfetch</text>
+  <text x="72" y="254" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="26" fill="#CBD5E1">Find the requests your frontend doesn't need.</text>
+  <rect x="72" y="291" width="102" height="30" rx="15" fill="#111827" stroke="#273449"/><text x="123.0" y="311" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#CBD5E1">N+1 reads</text><rect x="184" y="291" width="136" height="30" rx="15" fill="#111827" stroke="#273449"/><text x="252.0" y="311" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#CBD5E1">stacked polls</text><rect x="330" y="291" width="110" height="30" rx="15" fill="#111827" stroke="#273449"/><text x="385.0" y="311" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#CBD5E1">waterfalls</text><rect x="450" y="291" width="127" height="30" rx="15" fill="#111827" stroke="#273449"/><text x="513.5" y="311" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#CBD5E1">retry storms</text><rect x="587" y="291" width="136" height="30" rx="15" fill="#111827" stroke="#273449"/><text x="655.0" y="311" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#CBD5E1">coverage gaps</text>
+  <text x="72" y="358" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#64748B">TanStack Query · SWR · Apollo · RTK Query · plain fetch</text>
+
+  <rect x="780" y="56" width="440" height="288" rx="16" fill="#0F172A" stroke="#1E293B"/>
+  <text x="804" y="88" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#94A3B8">GET /api/v1/agents/{id}</text>
+  <text x="804" y="118" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" font-weight="700" fill="#FDBA74">before · 21 requests</text>
+  <rect x="804" y="132" width="72" height="6" rx="3" fill="#64748B"/><rect x="812" y="141" width="56" height="6" rx="3" fill="#f59e0b"/><rect x="819" y="150" width="56" height="6" rx="3" fill="#f5990e"/><rect x="826" y="159" width="56" height="6" rx="3" fill="#f49511"/><rect x="833" y="168" width="56" height="6" rx="3" fill="#f49014"/><rect x="840" y="177" width="56" height="6" rx="3" fill="#f48b17"/><rect x="847" y="186" width="56" height="6" rx="3" fill="#f3861a"/><rect x="854" y="195" width="56" height="6" rx="3" fill="#f3821d"/><rect x="861" y="204" width="56" height="6" rx="3" fill="#f37d20"/><rect x="868" y="213" width="56" height="6" rx="3" fill="#f27823"/><rect x="875" y="222" width="56" height="6" rx="3" fill="#f27326"/><rect x="882" y="231" width="56" height="6" rx="3" fill="#f26f29"/><rect x="889" y="240" width="56" height="6" rx="3" fill="#f26a2c"/><rect x="896" y="249" width="56" height="6" rx="3" fill="#f1652f"/><rect x="903" y="258" width="56" height="6" rx="3" fill="#f16032"/><rect x="910" y="267" width="56" height="6" rx="3" fill="#f15c35"/><rect x="917" y="276" width="56" height="6" rx="3" fill="#f05738"/><rect x="924" y="285" width="56" height="6" rx="3" fill="#f0523b"/><rect x="931" y="294" width="56" height="6" rx="3" fill="#f04d3e"/><rect x="938" y="303" width="56" height="6" rx="3" fill="#ef4941"/><rect x="945" y="312" width="56" height="6" rx="3" fill="#ef4444"/>
+  <path d="M1010 230H1044" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+  <path d="M1036 222L1044 230L1036 238" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="1060" y="118" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" font-weight="700" fill="#86EFAC">after · 2 requests</text>
+  <rect x="1060" y="132" width="72" height="6" rx="3" fill="#64748B"/>
+  <rect x="1068" y="141" width="64" height="6" rx="3" fill="#22C55E"/>
+  <text x="1060" y="170" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="12" fill="#64748B">?ids=a1,a2,…,a20</text>
+  <text x="804" y="332" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="12" fill="#475569">one read per row → one batch read</text>
+</svg>

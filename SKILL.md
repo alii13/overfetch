@@ -1,9 +1,9 @@
 ---
-name: request-audit
+name: overfetch
 description: Audit how a frontend app talks to its backend and produce a ranked, evidence-backed report of request amplification with concrete fixes - per-row N+1 reads, duplicate fetches, stacked poll timers, zero freshness, blanket invalidation, serial waterfalls, fetch-everything pagination, over-fetching, retry waste. Use this whenever someone asks why an app makes too many requests, wants a network / request / data-fetching / API-call audit, mentions N+1, waterfalls, polling, refetch storms, rate limits, backend load or RPS caused by the frontend, TanStack Query / React Query / SWR / Apollo / RTK Query cache behaviour, or hands over a HAR or network capture - even when they only say "the app feels chatty", "the backend is getting hammered", or "check our caching".
 ---
 
-# Request audit
+# overfetch: request audit
 
 You are producing a report someone will act on: a ranked list of the ways this app makes more requests than its screens need, each with evidence, a fix, and the number it should move. The report is only useful if every finding survives a sceptical reader, so the method below spends most of its effort on verification and on saying plainly what was and was not checked.
 
