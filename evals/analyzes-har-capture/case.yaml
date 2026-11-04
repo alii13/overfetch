@@ -12,6 +12,8 @@ expected_outcome: |
   duplicate (its body differs) and must exclude the three static assets from the
   API count (49 API requests). It should say what cannot be concluded without
   the source, keep attributions consistent with the capture's page labels, and
-  mark causes it cannot see (keys, hooks, independence) as inferences.
+  mark causes it cannot see (keys, hooks, independence) as inferences, and
+  name what one session cannot have exercised (unvisited routes, lazy chunks,
+  gated screens, error and empty states) with the captures that would.
 context:
   scaffold_script: place-files.sh

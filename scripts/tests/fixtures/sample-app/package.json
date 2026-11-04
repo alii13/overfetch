@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "@tanstack/react-query": "^5.90.0",
+    "@tanstack/react-router": "^1.130.0",
     "react": "^19.2.0"
   }
 }

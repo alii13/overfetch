@@ -19,6 +19,35 @@ Pick the screens from the scope step (landing route, busiest list, long-lived sh
 
 Note the data size you used (rows in the list, items in the tenant). The report must say "100 rows" not "a list".
 
+## Covering the parts a session never loads
+
+One session exercises one path through the app. Request bugs cluster in the parts nobody opens while developing: a dialog behind a dynamic import, a tab that mounts its own poll, a screen behind a flag, the branch that runs on a 403. Drive coverage from the map, not from habit.
+
+1. Run `coverage_map.py` on the source first. Its plan lists the routes with the most read sites, the lazy chunks to trigger (with the line that imports each, which tells you which button opens it), and the gated modules.
+2. Capture against the dev server when you can. A Vite or webpack dev server requests each module by path, so the map can mark exactly which modules and lazy chunks loaded. A production capture only shows chunk names, and only if the HAR includes script requests.
+3. Rerun the map with every capture and the visited-URL file. Close the biggest gaps, then list what stays uncovered under Limits with the reason (no fixture data, needs a role you do not have, platform you cannot run).
+
+## State matrix
+
+Every journey above has states that change the request pattern. Cover the rows that apply; each row is a separate capture or a labelled segment of one.
+
+| State | How to produce it | What it exposes |
+| --- | --- | --- |
+| Empty | A fresh tenant or a filter with no matches | Requests that fire anyway; polls waiting for rows that never come |
+| Populated, 50 to 100 rows | Fixture data or a seeded tenant | Per-row reads, page sizes, fan-out |
+| Large, at the page-size limit | Seed past one page | Pagination overshoot, fetch-all loops |
+| 403 / 404 / 500 on a key read | DevTools request blocking, a proxy rule, an MSW override, or a low-permission user | Retry storms, error-replay loops, remounts on error |
+| Slow network | DevTools throttling (Slow 4G) | Duplicate requests from impatient remounts, missing cancellation, waterfalls that only hurt when slow |
+| Offline, then reconnect | DevTools offline toggle | Reconnect refetch bursts, queued mutations |
+| Idle and visible, 5 minutes | Leave the tab in front, do nothing | Polls that never stop; focus listeners that fire anyway |
+| Hidden, then shown | Switch tabs or minimise for 2 minutes, then return | Background polling, refetch bursts on return |
+| Flag on / flag off | The flag tool, or a local override | Reads that only exist under a flag |
+| Admin / member / viewer | Three accounts | Permission-gated reads, 403 retries for the lower roles |
+| Desktop shell / browser | Run both builds | Focus semantics, persisted caches, platform-only reads |
+| Cache cold / warm | Clear site data (or the persisted store) versus a second load | What "first load" really costs; persisted-cache staleness |
+| Rapid navigation | Click through five routes in two seconds | Missing cancellation, requests for screens already left |
+| Mutation then navigate | Save, then leave before it settles | Invalidation hitting unmounted screens, double refetches |
+
 ## Capture methods
 
 **Chrome / Edge DevTools.** Network tab → tick "Preserve log" → run the journey → right-click → "Save all as HAR with content" (or without content for a smaller file). Pages are labelled by navigation. Bodies of POSTs are included, which lets the analyser tell duplicates apart.
@@ -32,9 +61,9 @@ node <skill-dir>/scripts/capture.mjs http://localhost:5175/orgs/acme capture.har
 node <skill-dir>/scripts/capture.mjs http://localhost:5175/ capture.har --journey journey.json
 ```
 
-`journey.json` is a list of steps: `{"goto": "/path"}`, `{"click": "text=Agents"}`, `{"hover": "[data-row]"}`, `{"wait": 3000}`, `{"blur": true}` (simulates leaving the window), `{"focus": true}`. The script waits for network idle plus the settle window after each step. Run it with `--help` for the options.
+`journey.json` is a list of steps: `{"goto": "/path"}`, `{"click": "text=Agents"}`, `{"hover": "[data-row]"}`, `{"wait": 3000}`, `{"blur": true}` (simulates leaving the window), `{"focus": true}`, `{"offline": true}` / `{"offline": false}`, `{"block": "**/api/v1/datasets/**", "status": 404}` (answer matching requests with that status from now on). The script waits for network idle plus the settle window after each step, and writes every URL the page was on to `OUT.visited.txt` for the coverage map. Run it with `--help` for the options.
 
-**Playwright MCP (agent-driven browser).** Drive the journey with the MCP tools, then read the request list the server exposes (`browser_network_requests` or equivalent). Convert it to the plain-rows JSON the analyser accepts: one object per request with `method`, `url`, `started` (ISO time or epoch ms), `duration_ms`, `status`, `size`, optional `body` and `page`. Write the list to a file and run `har_analyze.py` on it.
+**Playwright MCP (agent-driven browser).** Drive the journey with the MCP tools, then read the request list the server exposes (`browser_network_requests` or equivalent). Convert it to the plain-rows JSON the analyser accepts: one object per request with `method`, `url`, `started` (ISO time or epoch ms), `duration_ms`, `status`, `size`, optional `body` and `page` (set `page` to the URL the app was on, so the coverage map can mark the route visited). Keep script requests in the list: on a dev server they tell the map which modules loaded. Write the list to a file and run `har_analyze.py` and `coverage_map.py --har` on it.
 
 **The app's own request log.** Some apps keep an in-memory request log for support (method, path, status, timing, no bodies). If one exists, export it; it already excludes static assets. Without bodies, POST duplicates stay "unverified".
 

@@ -39,9 +39,12 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlsplit
 
 STATIC_EXT_RE = re.compile(
-    r"\.(?:js|mjs|cjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|eot|mp4|webm|mp3|wasm|html?)(?:$|\?)",
+    r"\.(?:js|mjs|cjs|ts|tsx|jsx|vue|svelte|css|scss|less|map|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|eot"
+    r"|mp4|webm|mp3|wasm|html?)(?:$|\?)",
     re.I,
 )
+# Dev-server internals (Vite, webpack-dev-server) and the capture script's own markers.
+DEV_PATH_RE = re.compile(r"/(?:@vite|@id|@fs|@react-refresh|node_modules|__vite_ping|__webpack_hmr|__request-audit__)(?:/|$)")
 STATIC_HOST_RE = re.compile(r"(?:^|\.)(?:fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.|cdnjs\.cloudflare\.com|unpkg\.com|jsdelivr\.net)", re.I)
 ID_SEGMENT_RES = [
     re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I),  # uuid
@@ -163,7 +166,8 @@ def make_request(index: int, method: str, url: str, start: Optional[float], dura
         ids = re.findall(r"\"(?:ids?|artifact_ids?|keys?)\"\s*:\s*\[([^\]]*)\]", body)
         if ids:
             batch = max(len(re.findall(r"[A-Za-z0-9_-]{6,}", group)) for group in ids) or None
-    is_static = bool(STATIC_EXT_RE.search(path)) or bool(STATIC_HOST_RE.search(parts.netloc))
+    is_static = (bool(STATIC_EXT_RE.search(path)) or bool(STATIC_HOST_RE.search(parts.netloc))
+                 or bool(DEV_PATH_RE.search(path)))
     duration = duration or 0.0
     return Request(
         index=index, method=method.upper(), url=url, host=parts.netloc, path=path, template=template,

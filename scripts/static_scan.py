@@ -298,38 +298,47 @@ class ImportGraph:
                 if re.search(rf"\b{re.escape(symbol)}\b", clause)]
 
 
-def build_import_graph(files: List[SourceFile], root: str) -> ImportGraph:
-    ids = {module_id(f.rel): f.rel for f in files}
+def make_resolver(files: List[SourceFile], root: str):
+    """Return resolve(importer_rel, spec) -> module_id or None, for relative and aliased specs."""
+    ids = {module_id(f.rel) for f in files}
     src_root = "src" if os.path.isdir(os.path.join(root, "src")) else ""
-    importers: Dict[str, List[Tuple[str, str]]] = {mid: [] for mid in ids}
-    imports: Dict[str, List[Tuple[str, str]]] = {}
     by_basename: Dict[str, List[str]] = {}
     for mid in ids:
         by_basename.setdefault(mid.rsplit("/", 1)[-1], []).append(mid)
 
+    def resolve(importer_rel: str, spec: str) -> Optional[str]:
+        target: Optional[str] = None
+        if spec.startswith("."):
+            importer_dir = os.path.dirname(importer_rel).replace(os.sep, "/")
+            target = os.path.normpath(os.path.join(importer_dir, spec)).replace(os.sep, "/")
+        else:
+            for prefix in ALIAS_PREFIXES:
+                if spec.startswith(prefix):
+                    rest = spec[len(prefix):]
+                    target = (f"{src_root}/{rest}" if src_root else rest).lstrip("/")
+                    break
+        if target is None:
+            return None
+        target = os.path.splitext(target)[0] if target.endswith(SOURCE_EXTENSIONS) else target
+        target = target.replace("\\", "/")
+        if target in ids:
+            return target
+        candidates = by_basename.get(target.rsplit("/", 1)[-1], [])
+        return candidates[0] if len(candidates) == 1 else None
+
+    return resolve
+
+
+def build_import_graph(files: List[SourceFile], root: str) -> ImportGraph:
+    resolve = make_resolver(files, root)
+    importers: Dict[str, List[Tuple[str, str]]] = {module_id(f.rel): [] for f in files}
+    imports: Dict[str, List[Tuple[str, str]]] = {}
     for f in files:
-        importer_dir = os.path.dirname(f.rel).replace(os.sep, "/")
         for match in IMPORT_RE.finditer(f.text):
             clause = (match.group(1) or "").strip()
-            spec = match.group(2)
-            target: Optional[str] = None
-            if spec.startswith("."):
-                target = os.path.normpath(os.path.join(importer_dir, spec)).replace(os.sep, "/")
-            else:
-                for prefix in ALIAS_PREFIXES:
-                    if spec.startswith(prefix):
-                        rest = spec[len(prefix):]
-                        target = f"{src_root}/{rest}" if src_root else rest
-                        target = target.lstrip("/")
-                        break
+            target = resolve(f.rel, match.group(2))
             if target is None:
                 continue
-            target = target.replace("\\", "/")
-            if target not in ids:
-                candidates = by_basename.get(target.rsplit("/", 1)[-1], [])
-                if len(candidates) != 1:
-                    continue
-                target = candidates[0]
             importers[target].append((f.rel, clause))
             imports.setdefault(f.rel, []).append((target, clause))
     return ImportGraph(importers=importers, imports=imports)

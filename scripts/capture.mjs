@@ -15,20 +15,24 @@
  *   {"hover": "[data-row]"}    hover the first match; add "all": true to hover each match
  *   {"type": ["input[name=q]", "lineage"]}
  *   {"wait": 3000}             pause in ms
- *   {"blur": true}             dispatch visibilitychange(hidden) + blur, like leaving the window
+ *   {"blur": true}             visibilitychange(hidden) + blur, like leaving the window
  *   {"focus": true}            the reverse
- *   {"label": "home"}          start a new HAR page so the analyser can split counts
+ *   {"offline": true}          go offline; {"offline": false} reconnects
+ *   {"block": "**\/api/v1/x/**", "status": 404}
+ *                              answer matching requests with that status from now on
+ *   {"label": "home"}          a marker line in the visited file
  *
  * The script waits for network idle plus --settle after every step, then
- * --idle (default 0) at the end for polling to show up.
+ * --idle (default 0) at the end for polling to show up. Every URL the page was
+ * on is written to OUT.visited.txt, which coverage_map.py reads with --visited.
  */
 import { createRequire } from "node:module"
-import { readFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 
 const args = process.argv.slice(2)
 if (args.includes("--help") || args.length < 2) {
-  console.log(readFileSync(new URL(import.meta.url)).toString().split("*/")[0].replace(/^\/\*\*?\s?/, "").replace(/^ \* ?/gm, ""))
+  console.log(readFileSync(new URL(import.meta.url)).toString().split("*/")[0].replace(/^#!.*\n\/\*\*?\s?/, "").replace(/^ \* ?/gm, ""))
   process.exit(args.includes("--help") ? 0 : 2)
 }
 
@@ -64,10 +68,18 @@ const context = await browser.newContext({
   storageState: storage ?? undefined,
 })
 const page = await context.newPage()
+const visited = [`# ${new Date().toISOString()} ${url}`]
+const note = (line) => {
+  if (visited[visited.length - 1] !== line) visited.push(line)
+}
+page.on("framenavigated", (frame) => {
+  if (frame === page.mainFrame()) note(frame.url())
+})
 
 async function quiet() {
   await page.waitForLoadState("networkidle").catch(() => {})
   await page.waitForTimeout(settle)
+  note(page.url()) // client-side routing changes the URL without a navigation event
 }
 
 await page.goto(url)
@@ -83,27 +95,22 @@ for (const step of steps) {
     } else await page.hover(step.hover)
   } else if (step.type) await page.fill(step.type[0], step.type[1])
   else if (step.wait) await page.waitForTimeout(step.wait)
-  else if (step.blur) {
-    await page.evaluate(() => {
-      Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })
+  else if (step.blur || step.focus) {
+    const hidden = Boolean(step.blur)
+    await page.evaluate((hide) => {
+      Object.defineProperty(document, "visibilityState", { value: hide ? "hidden" : "visible", configurable: true })
       document.dispatchEvent(new Event("visibilitychange"))
-      window.dispatchEvent(new Event("blur"))
-    })
-  } else if (step.focus) {
-    await page.evaluate(() => {
-      Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
-      document.dispatchEvent(new Event("visibilitychange"))
-      window.dispatchEvent(new Event("focus"))
-    })
-  } else if (step.label) {
-    // Playwright has no public "new HAR page" API; the label is recorded as a
-    // marker request the analyser can see in the timeline.
-    await page.evaluate((label) => fetch(`/__request-audit__/${encodeURIComponent(label)}`).catch(() => {}), step.label)
-  }
+      window.dispatchEvent(new Event(hide ? "blur" : "focus"))
+    }, hidden)
+  } else if (typeof step.offline === "boolean") await context.setOffline(step.offline)
+  else if (step.block) {
+    await context.route(step.block, (route) => route.fulfill({ status: step.status ?? 500, body: "" }))
+  } else if (step.label) note(`# label: ${step.label}`)
   await quiet()
 }
 
 if (idle > 0) await page.waitForTimeout(idle)
 await context.close()
 await browser.close()
+writeFileSync(`${out}.visited.txt`, visited.join("\n") + "\n")
 console.log(out)

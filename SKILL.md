@@ -12,10 +12,11 @@ You are producing a report someone will act on: a ranked list of the ways this a
 One markdown report (template in `references/report-template.md`) with:
 
 1. Scope and evidence: what tree, which commit, which captures.
-2. Findings ranked by how the request count grows, each with `file:line` or capture evidence, root cause, the fix pattern, expected delta, effort.
-3. Non-findings: patterns you checked and ruled out, with the reason. These stop the next person re-investigating.
-4. Open product decisions and backend asks: things that need a human or an API change, not a client patch.
-5. Limits: what the audit could not measure.
+2. Coverage: every route, lazy chunk and gated data site, and which of them were read in code only versus exercised in a capture.
+3. Findings ranked by how the request count grows, each with `file:line` or capture evidence, root cause, the fix pattern, expected delta, effort.
+4. Non-findings: patterns you checked and ruled out, with the reason. These stop the next person re-investigating.
+5. Open product decisions and backend asks: things that need a human or an API change, not a client patch.
+6. Limits: what the audit could not measure.
 
 Offer to implement fixes afterwards, one PR per finding, highest severity first. Do not start fixing during the audit.
 
@@ -28,6 +29,8 @@ Offer to implement fixes afterwards, one PR per finding, highest severity first.
 **Know the library's real semantics before you blame it.** The mistakes that cost the most are confident claims that are wrong: "the cache dedupes this" when the keys differ, "polling pauses when idle" when it only pauses when hidden, "three callers, three fetches a minute" when the library re-syncs same-key timers and shares the fetch. `references/library-facts.md` holds the facts for TanStack Query, SWR, Apollo and RTK Query, with the source path each was checked against. Read the section for the library in use before writing any sentence about caching or polling, and when a claim decides a finding, open the installed library's source and confirm it.
 
 **Rank by growth, not by count.** A read that scales with rows, with mounted components, or with time is worse than a fixed duplicate. The severity rubric below is about growth class.
+
+**Coverage has a denominator.** A capture sees only the code that loaded while it ran: the routes someone visited, the dialogs and tabs someone opened, the flags that were on, the states the backend happened to return. Lazy chunks, gated screens and error paths are exactly where request bugs hide, because nobody looks at them during development. So every audit starts from the full surface (`coverage_map.py`), every "no issue" is scoped to what was covered, and the report says which parts were exercised live and which were only read.
 
 **Say what is fine.** A hover prefetch that is one deduped read per row is a non-finding. Write it down as one. A report that only lists problems makes the reader wonder what else was missed.
 
@@ -45,7 +48,27 @@ Tell the user up front how long this takes. A static-only audit of a mid-sized a
 - Record the commit: `git rev-parse HEAD`. Every report line refers to this revision.
 - Decide whether a live capture is possible: a running dev server plus a browser you can drive, or a HAR the user already has. If neither, the audit is static-only, and the report must say so in its first paragraph.
 
-### 2. Static scan
+### 2. Coverage map
+
+```bash
+python3 <skill-dir>/scripts/coverage_map.py <app-root> --format md --out coverage.md
+```
+
+This is the denominator. It lists every route (file-based routers for TanStack Router, Next.js, Remix, SvelteKit and SolidStart; code-defined routers by their path literals; entry files otherwise), every dynamic `import()` boundary with the reads behind it, every data module gated by a flag, platform, permission or env check, every endpoint path literal in source, and the data modules no route reaches. It runs in a few seconds on a 2,000-file app.
+
+Use it three ways:
+
+- **To plan.** The capture plan at the bottom names the routes with the most read sites, the lazy chunks to trigger, and the gates to toggle. Use it to choose the journeys in step 6 instead of guessing.
+- **To scope the scan.** A finding in a module no route reaches is dead code or reached by something the map cannot resolve. Check which before calling it live.
+- **To close the loop.** After capturing, rerun it with the captures; it marks which routes were visited, which modules and lazy chunks loaded (exactly, for a dev-server capture), which gated modules ran, and which endpoint paths appeared:
+
+```bash
+python3 <skill-dir>/scripts/coverage_map.py <app-root> --har home.har --har library.har --visited home.har.visited.txt --format md
+```
+
+Repeat captures until the routes and lazy chunks with the most read sites are covered, or write down why they are not (no fixture data, needs a role you do not have, platform you cannot run).
+
+### 3. Static scan
 
 ```bash
 python3 <skill-dir>/scripts/static_scan.py <app-root> --format md --out scan.md
@@ -56,7 +79,7 @@ The scan is fast (about ten seconds for 2,000 files) and needs only Python 3.9+.
 
 Add `--exclude` for generated trees the defaults miss, `--min-confidence medium` when the list is long and you want the first pass tight.
 
-### 3. Verify candidates
+### 4. Verify candidates
 
 Work through the candidates in this order: P0 by confidence, then P1, then the rest. For each one you keep, you must have opened the file and be able to answer:
 
@@ -69,7 +92,7 @@ Drop candidates that fail these checks and keep the ones you drop that a reader 
 
 The catalog entry for each detector lists the specific non-finding conditions. Read it for every detector id that appears in the scan; it is organised by the same ids.
 
-### 4. Cross-cutting checks the scanner cannot do
+### 5. Cross-cutting checks the scanner cannot do
 
 These need reading, not grepping. Do all of them; most audits find at least one.
 
@@ -84,9 +107,13 @@ These need reading, not grepping. Do all of them; most audits find at least one.
 - **Persistence.** If the cache is persisted (IndexedDB, localStorage, a native store), what is `maxAge`, what busts it on deploy, and is the store per platform? A persisted cache changes what "cold load" means in a capture; say which you measured.
 - **Mutations.** For the five most common writes, what gets invalidated? Root invalidations after a small write are the usual find.
 
-### 5. Live capture
+### 6. Live capture
 
-If you can run the app or the user gave you a capture, get numbers. `references/capture.md` has the journeys to run, how to capture (DevTools HAR, Playwright, the bundled `scripts/capture.mjs`, or the app's own request log), and how to keep captures comparable.
+If you can run the app or the user gave you a capture, get numbers. `references/capture.md` has the journeys to run, the state matrix (empty, populated, error, slow, offline, idle, hidden, gated, cold and warm cache), how to capture (DevTools HAR, Playwright, the bundled `scripts/capture.mjs`, or the app's own request log), and how to keep captures comparable.
+
+Pick journeys from the coverage map's plan, not from habit. Prefer the dev server when you can run it: its captures name every module that loaded, so the map can say exactly which lazy chunks and gated modules ran. Then rerun the map with the captures (step 2) and either capture the gaps or list them under Limits.
+
+When all you have is a capture someone else took, you cannot see what it missed from the capture alone. Say so, list what a single session usually misses (unvisited routes, unopened dialogs and tabs, flag and role variants, error and empty states, idle and hidden-tab behaviour), and recommend the captures that would close it.
 
 ```bash
 python3 <skill-dir>/scripts/har_analyze.py capture.har --format md --out capture.md
@@ -99,13 +126,13 @@ Two things to keep straight when reading it:
 - A POST to the same URL twice is a duplicate only when the body hash matches. If bodies were not captured, the tool says "unverified"; report it that way.
 - A serial chain is a waterfall only if the later request needed nothing from the earlier one. The tool finds the shape; you confirm the dependency in code.
 
-### 6. Reconcile
+### 7. Reconcile
 
 Pair every static finding with capture evidence where a capture covers that screen. When they disagree, the capture wins for counts and the code wins for cause. When a capture shows amplification that no candidate explains, read the code until it does; that is usually a key-canonicality or dependent-key issue from step 4.
 
 If the repo carries an earlier audit or performance doc, check each of its claims that touch your findings against the code at this commit, and list the contradictions in the report. Stale claims are how the same bug gets "fixed" twice.
 
-### 7. Rank and write
+### 8. Rank and write
 
 Use the rubric:
 
@@ -116,6 +143,8 @@ Use the rubric:
 | P2 | Latency, bytes, or ownership, not count growth | serial awaits that could run together, fetch-everything page sizes, full detail read for a label, a TanStack poll defined in several callers |
 | P3 | Hygiene that enables the above | inline keys that drift, HTTP calls outside the data layer |
 | info | Worth recording, not a defect | hover prefetch that is one read per row, persistence and focus semantics, retry defaults |
+
+Fill the Coverage section from the last coverage map run: the routes, data modules, lazy chunks, gated modules and endpoint paths that were exercised out of the total, and the ones read in code only. A finding or non-finding in code that no capture exercised says "static only" next to it.
 
 For each finding, estimate the delta as a formula with the inputs named, then plug in what you measured: "100 rows × 1 read → 1 batch; measured 100 → 1 on the 100-row fixture". Give effort in hours for a developer who knows the codebase.
 
@@ -146,6 +175,7 @@ The catalog has the detail; these are the names to use in the report so a reader
 - Calling a hover prefetch a finding. For a bounded list with one deduped read per row it is working as designed; record it under non-findings.
 - Counting POSTs with the same URL as duplicates. Different bodies are different reads.
 - Trusting the repo's audit doc for staleTime values. Three of four were wrong at the commit being audited.
+- Calling an app clean after capturing the landing page. The request bug lived in a dialog loaded by a dynamic import that the capture never opened. The coverage map lists those chunks; trigger them or say they were read only.
 - Inventing a count ("6+") because it felt right. If there is no measurement, write the formula and "unmeasured".
 - Treating a fixture capture as a production number. A fixture proves the amplification shape; it does not prove the daily request volume.
 - Suggesting a batch endpoint that does not exist. Read the API client first; if it is missing, it is a backend ask, and the client fix is a limiter in the meantime.
@@ -156,4 +186,4 @@ The catalog has the detail; these are the names to use in the report so a reader
 - `references/library-facts.md`: the cache, freshness, focus and polling semantics of TanStack Query (v4/v5), SWR, Apollo Client and RTK Query. Read the section for the library in use before writing about it.
 - `references/capture.md`: journeys to capture, capture methods per environment (browser, Playwright, desktop shells), and how to make before/after captures comparable.
 - `references/report-template.md`: the report, section by section, with what each must contain.
-- `scripts/static_scan.py`, `scripts/har_analyze.py`, `scripts/capture.mjs`: the tools. `--help` on each.
+- `scripts/coverage_map.py`, `scripts/static_scan.py`, `scripts/har_analyze.py`, `scripts/capture.mjs`: the tools. `--help` on each.

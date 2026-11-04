@@ -11,6 +11,7 @@ Works with TanStack Query (React Query), SWR, Apollo Client, RTK Query, and apps
 A markdown report:
 
 - **Scope and evidence**: tree, commit, library, cache defaults, captures.
+- **Coverage**: every route, lazy chunk, gated data site and endpoint, and which were exercised in a capture versus read in code only.
 - **Findings**, ranked P0 to P3, each with evidence, cause, fix pattern, measured or formula-based delta, and effort.
 - **Non-findings**: what was checked and ruled out, so nobody re-investigates.
 - **Open decisions** and **backend asks**: the parts that are not a client patch.
@@ -55,6 +56,9 @@ The agent runs the static scan, reads the code behind each candidate, captures t
 You can also run the tools without an agent:
 
 ```bash
+# the whole surface: routes, lazy chunks, gated reads, endpoints; add --har to mark what a capture exercised
+python3 scripts/coverage_map.py path/to/app --format md --out coverage.md
+
 # candidates from the source tree
 python3 scripts/static_scan.py path/to/app --format md --out scan.md
 
@@ -87,17 +91,20 @@ The full list, with how each is verified and fixed, is in [`references/catalog.m
 
 ## How it works
 
-1. **Scan**: `static_scan.py` walks the tree, builds an import graph, finds components and data hooks, and emits candidates with a confidence per detector.
-2. **Verify**: the agent reads the code behind every candidate it keeps. A regex hit is never reported as a finding on its own.
-3. **Cross-cutting reads** the scanner cannot do: key canonicality, dependent keys, freshness per data family, poll ownership, focus semantics, pagination contracts, retry policy, persistence, mutation invalidation.
-4. **Capture**: a HAR or request log is analysed for bursts, stacked timers, duplicates (POST bodies hashed), serial chains, repeated errors and large responses.
-5. **Reconcile and rank**: measured counts win over assumptions; the code explains the cause; findings are ranked by growth class; non-findings and limits are written down.
+1. **Map the surface**: `coverage_map.py` lists every route, dynamic-import boundary, flag/platform/permission-gated data module and endpoint path, so the audit has a denominator and the captures have a plan.
+2. **Scan**: `static_scan.py` walks the tree, builds an import graph, finds components and data hooks, and emits candidates with a confidence per detector.
+3. **Verify**: the agent reads the code behind every candidate it keeps. A regex hit is never reported as a finding on its own.
+4. **Cross-cutting reads** the scanner cannot do: key canonicality, dependent keys, freshness per data family, poll ownership, focus semantics, pagination contracts, retry policy, persistence, mutation invalidation.
+5. **Capture**: journeys chosen from the map and run across a state matrix (empty, populated, error, slow, offline, idle, hidden, flags, roles, cold and warm cache). The HAR is analysed for bursts, stacked timers, duplicates (POST bodies hashed), serial chains, repeated errors and large responses, and the map is rerun to show what the captures exercised.
+6. **Reconcile and rank**: measured counts win over assumptions; the code explains the cause; findings are ranked by growth class; non-findings and limits are written down.
 
 ## Limits
 
 - The scanner reads text, not types. It cannot see through dynamic component maps, string-built keys, or hooks composed more than one level deep. Confidence tells you how often a detector is right, not how bad the issue is.
 - The import graph resolves relative paths and common aliases (`@/`, `~/`, `src/`); exotic alias maps fall back to basename matching.
 - A capture from fixture data proves a shape, not production volume.
+- Module-level capture coverage is exact against a dev server; against a production build it relies on chunk names, and code-split chunks named by id cannot be matched.
+- Route detection covers file-based routers and the path literals of code-defined ones; nested relative paths in code-defined routers are not joined.
 - RTK Query's per-entry polling and Apollo's normalized cache change what counts as a finding; the library facts file covers the differences, but the scanner's severities assume per-observer semantics.
 
 ## Tests
@@ -106,7 +113,7 @@ The full list, with how each is verified and fixed, is in [`references/catalog.m
 python3 -m unittest discover -s scripts/tests -v
 ```
 
-Thirty-one tests cover both scripts against a fixture app with planted issues and a synthetic HAR. Add a fixture file and a test for any new detector.
+Forty-four tests cover the three Python tools against a fixture app with planted issues (including file routes, a lazily loaded dialog and a flag gate) and a synthetic HAR. Add a fixture file and a test for any new detector.
 
 ## Evals
 

@@ -9,7 +9,11 @@ expected_outcome: |
   severity), the QueryClient with no default staleTime, staleTime: 0 on the agent
   list, the effect-driven fetch and uncleared setInterval in LegacyPanel, the
   serial awaits / unbounded Promise.all / limit 1000 loop in loaders.ts, and the
-  agentNames vs agent-names key drift. It explicitly says CleanList and
+  agentNames vs agent-names key drift, plus the unconditional 10 s poll in the
+  lazily loaded, flag-gated AgentDetailsDialog. It has a coverage section
+  listing the routes, the lazy dialog and its gate as read in code only, and
+  separates code no route reaches (names-a, names-b, loaders.ts) from live
+  findings. It explicitly says CleanList and
   useAgentNames are fine (non-findings), says the audit is static-only with no
   capture, and does not invent measured numbers.
 context:

@@ -14,6 +14,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
+import coverage_map  # noqa: E402
 import har_analyze  # noqa: E402
 import static_scan  # noqa: E402
 from har_fixture import build as build_har  # noqa: E402
@@ -231,6 +232,112 @@ class HarAnalyzeTests(unittest.TestCase):
 
     def test_cli_rejects_missing_file(self) -> None:
         self.assertEqual(har_analyze.main(["/nonexistent.har"]), 2)
+
+
+class CoverageMapTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.static = coverage_map.build_map(SAMPLE_APP, [], [], [])
+        cls.tmp = tempfile.TemporaryDirectory()
+        rows = [
+            # A dev-server session that loaded the home route and the billing settings, never opening a row.
+            {"method": "GET", "url": "http://localhost:5173/src/main.tsx", "started": 1762250400000, "duration_ms": 5},
+            {"method": "GET", "url": "http://localhost:5173/src/routes/index.tsx", "started": 1762250400010, "duration_ms": 5},
+            {"method": "GET", "url": "http://localhost:5173/src/components/agent-list.tsx", "started": 1762250400020, "duration_ms": 5},
+            {"method": "GET", "url": "http://localhost:5173/@vite/client", "started": 1762250400030, "duration_ms": 5},
+            {"method": "GET", "url": "http://localhost:5173/api/v1/agents?org=org_example&limit=50", "started": 1762250400100, "duration_ms": 50},
+            {"method": "GET", "url": "http://localhost:5173/v1/billing/summary?org=org_example", "started": 1762250400120, "duration_ms": 50},
+        ]
+        cls.capture = os.path.join(cls.tmp.name, "session.json")
+        with open(cls.capture, "w", encoding="utf-8") as handle:
+            json.dump(rows, handle)
+        cls.visited = os.path.join(cls.tmp.name, "visited.txt")
+        with open(cls.visited, "w", encoding="utf-8") as handle:
+            handle.write("# journey: home then billing\nhttp://localhost:5173/\nhttp://localhost:5173/settings/billing\n")
+        cls.covered = coverage_map.build_map(SAMPLE_APP, [], [cls.capture], [cls.visited])
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.tmp.cleanup()
+
+    def route(self, result: dict, pattern: str) -> dict:
+        return next(r for r in result["routes"] if r["pattern"] == pattern)
+
+    def test_router_and_routes(self) -> None:
+        self.assertEqual(self.static["router"], "TanStack Router file routes")
+        patterns = {r["pattern"] for r in self.static["routes"]}
+        self.assertEqual(patterns, {"(entry)", "/", "/ (layout)", "/settings/billing", "/agents/$agentId"})
+        self.assertEqual(self.route(self.static, "/ (layout)")["file"], "src/routes/__root.tsx")
+
+    def test_lazy_boundary_and_gate(self) -> None:
+        bounds = self.static["lazy_boundaries"]
+        self.assertEqual(len(bounds), 1)
+        self.assertEqual(bounds[0]["target"], "src/components/agent-details-dialog.tsx")
+        self.assertTrue(bounds[0]["loaded_from"].startswith("src/components/agent-list.tsx:"))
+        self.assertIn("flag", bounds[0]["gates"])
+        self.assertEqual(bounds[0]["polls"], 1)
+        self.assertIn("src/components/agent-details-dialog.tsx", self.route(self.static, "/")["data_modules_lazy"])
+        self.assertEqual([g["module"] for g in self.static["gated"]], ["src/components/agent-details-dialog.tsx"])
+
+    def test_unreached_modules(self) -> None:
+        self.assertEqual({u["module"] for u in self.static["unreached"]},
+                         {"src/lib/loaders.ts", "src/components/names-a.tsx", "src/components/names-b.tsx"})
+
+    def test_endpoints_extracted(self) -> None:
+        endpoints = {e["endpoint"] for e in self.static["endpoints"]}
+        self.assertTrue({"/v1/me", "/api/v1/agents", "/api/v1/agents/{}", "/api/v1/agents/{}/runs",
+                         "/v1/billing/summary", "/v1/status"} <= endpoints, endpoints)
+
+    def test_static_only_has_no_coverage(self) -> None:
+        self.assertIsNone(self.static["covered"])
+        self.assertTrue(any("Lazy chunks to trigger" in step for step in self.static["plan"]))
+
+    def test_capture_marks_visited_routes(self) -> None:
+        self.assertTrue(self.route(self.covered, "/")["visited"])
+        self.assertTrue(self.route(self.covered, "/settings/billing")["visited"])
+        self.assertTrue(self.route(self.covered, "/ (layout)")["visited"])
+        self.assertFalse(self.route(self.covered, "/agents/$agentId")["visited"])
+
+    def test_capture_marks_unloaded_lazy_chunk(self) -> None:
+        self.assertFalse(self.covered["lazy_boundaries"][0]["loaded"])
+        self.assertFalse(self.covered["gated"][0]["loaded"])
+        self.assertEqual(self.covered["capture"]["module_signal"], "dev-server module paths")
+        loaded = {d["module"] for d in self.covered["data_modules"] if d["loaded"]}
+        self.assertIn("src/components/agent-list.tsx", loaded)
+
+    def test_capture_marks_endpoints(self) -> None:
+        seen = {e["endpoint"]: e["seen"] for e in self.covered["endpoints"]}
+        self.assertTrue(seen["/api/v1/agents"])
+        self.assertTrue(seen["/v1/billing/summary"])
+        self.assertFalse(seen["/api/v1/agents/{}/runs"])
+        self.assertFalse(seen["/v1/status"])
+
+    def test_plan_names_the_gaps(self) -> None:
+        plan = " ".join(self.covered["plan"])
+        self.assertIn("/agents/$agentId", plan)
+        self.assertIn("agent-details-dialog.tsx", plan)
+        self.assertNotIn("/settings/billing (", plan)
+
+    def test_chunk_name_matching(self) -> None:
+        bases = {"agent-details-dialog-b-x3kq9z", "index-8f3abc12", "vendor.1a2b3c4d"}
+        self.assertTrue(coverage_map.module_loaded("src/components/agent-details-dialog.tsx", [], bases))
+        self.assertFalse(coverage_map.module_loaded("src/components/agent.tsx", [], bases))
+
+    def test_route_matching(self) -> None:
+        self.assertTrue(coverage_map.route_matches("/agents/$agentId", "/agents/abc", False))
+        self.assertFalse(coverage_map.route_matches("/", "/agents/abc", True))
+        self.assertTrue(coverage_map.route_matches("/", "/agents/abc", False))
+        self.assertTrue(coverage_map.route_matches("/docs/[...slug]", "/docs/a/b", True))
+
+    def test_markdown_renders(self) -> None:
+        md = coverage_map.to_markdown(self.covered)
+        self.assertIn("## Capture coverage", md)
+        self.assertIn("Lazy boundaries loaded | 0 of 1", md)
+
+    def test_dev_assets_are_not_api_requests(self) -> None:
+        reqs = har_analyze.load_capture(self.capture)
+        api = [r for r in reqs if not r.is_static]
+        self.assertEqual(len(api), 2)
 
 
 if __name__ == "__main__":

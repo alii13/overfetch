@@ -18,6 +18,21 @@ Use these sections in this order. Claim first, evidence second, fix third. A rea
 | Captures | <none> or one row per capture: journey, data size, file |
 | Not covered | <routes, platforms, or flows not examined> |
 
+## Coverage
+
+<One sentence: what the static scan read (all N modules) and what the captures exercised.>
+
+| Surface | Read in code | Exercised in a capture |
+| --- | --- | --- |
+| Routes | 83 | 12 (list in coverage.md) |
+| Data modules | 559 | 140 (dev-server capture) |
+| Lazy chunks with reads | 195 | 9 |
+| Gated data modules (flag / platform / permission) | 38 | 4 |
+| Endpoint paths in source | 151 | 47 |
+| States (empty, error, slow, offline, idle, hidden, roles, cold/warm) | n/a | <which> |
+
+Not exercised and why: <the high-read routes and lazy chunks no capture reached, with the reason: no fixture data, needs a role, platform not available>. Findings in that code are marked "static only".
+
 ## Findings
 
 | # | Severity | Finding | Growth | Measured | Fix pattern | Effort |
@@ -68,5 +83,6 @@ Rules for filling it in:
 - Every number names its source (a capture file and section, or a code path with the inputs to the formula).
 - "Measured" is a before → after from a capture, or "unmeasured" with the formula. Never a guess.
 - The effort column is hours for someone who knows the codebase. Include tests and review.
-- If the audit is static-only, the first paragraph says so and the Measured column says "unmeasured" throughout.
+- If the audit is static-only, the first paragraph says so and the Measured column says "unmeasured" throughout. The Coverage table still lists the surface, with "none" in the exercised column.
+- Each finding says whether its code was exercised in a capture or read only ("static only"). A non-finding about code no capture reached is a non-finding of the code, not of the behaviour.
 - Keep the findings table to the ones you verified. Candidates you did not read go under Limits as "not reviewed: <count> <detector> candidates", not in the table.
