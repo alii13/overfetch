@@ -113,6 +113,8 @@ If you can run the app or the user gave you a capture, get numbers. `references/
 
 Pick journeys from the coverage map's plan, not from habit. Prefer the dev server when you can run it: its captures name every module that loaded, so the map can say exactly which lazy chunks and gated modules ran. Then rerun the map with the captures (step 2) and either capture the gaps or list them under Limits.
 
+A capture shows what happened, never why. In a capture-only audit, hedge each causal clause where it stands ("consistent with two query keys", "likely a remount"), not once in a disclaimer at the top: readers quote single sentences, and an unhedged "because" travels without its disclaimer.
+
 When all you have is a capture someone else took, you cannot see what it missed from the capture alone. Say so, list what a single session usually misses (unvisited routes, unopened dialogs and tabs, flag and role variants, error and empty states, idle and hidden-tab behaviour), and recommend the captures that would close it.
 
 ```bash
