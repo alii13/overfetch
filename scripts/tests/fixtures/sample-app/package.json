@@ -1,0 +1,8 @@
+{
+  "name": "sample-app",
+  "private": true,
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.0",
+    "react": "^19.2.0"
+  }
+}

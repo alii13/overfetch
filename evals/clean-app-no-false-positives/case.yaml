@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: clean-app-no-false-positives
+expected_outcome: |
+  audit.md reports no P0 findings. It says the per-row rendering is backed by a
+  batch names read (not N+1), the poll is data-driven from one owner (not a
+  storm), the QueryClient has sane defaults (staleTime 60 s, retry skips 4xx),
+  invalidation is narrow, and the loader runs its reads in parallel. It states
+  that the claim of N+1 and polling storms is not supported by the code, names
+  what was checked, and notes the audit is static-only. It may list hygiene
+  items (P3/info) but must not recommend a rewrite.
+context:
+  scaffold_script: place-files.sh
