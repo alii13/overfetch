@@ -6,7 +6,7 @@ The cases, prompts and assertions live in [`../evals/`](../evals). Every asserti
 
 ## Latest: iteration 2, 2026-11-04
 
-A fourth case, `eager-offscreen-tabs` (reads mounted for tabs the user has not opened, against an owner who asked for fetch on demand), was added on 2026-11-08 and has not been run yet.
+A fourth case, `eager-offscreen-tabs` (reads mounted for tabs the user has not opened, against an owner who asked for fetch on demand), was added on 2026-11-08 and run once per configuration with `claude plugin eval` (executor and judge Claude Opus 5.5, three judge votes per assertion): with overfetch 5 / 5, without 4 / 5. Both runs found the eager tab reads, left the fetch-on-open dialog alone and did not recommend prefetching every tab. The baseline stated its request counts as measured and never said the audit was static-only. The prompt states the owner's intent, which hands the baseline the deciding fact, so this case does not yet show the new guidance making a difference on its own.
 
 | Case | With overfetch | Without |
 | --- | --- | --- |
