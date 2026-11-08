@@ -16,6 +16,7 @@ Use these sections in this order. Claim first, evidence second, fix third. A rea
 | Defaults | staleTime <value>, gcTime <value>, retry <policy>, focus refetch <on/off + listener> |
 | Static scan | <files> files, <N> candidates (<P0>/<P1>/<P2>), <verified> read and kept |
 | Captures | <none> or one row per capture: journey, data size, file |
+| Intent | <per screen: instant open (prefetch) or on demand, as the owner said; or "not asked, assumed on demand"> |
 | Not covered | <routes, platforms, or flows not examined> |
 
 ## Coverage
@@ -53,6 +54,7 @@ Delta: <formula with inputs> → <measured or "unmeasured">.
 | Checked | Why it is fine |
 | --- | --- |
 | Hover prefetch on <list> | One deduped read per row; 10 hovers → 10 reads, 0 repeats in capture <file> |
+| Fetch on open in <dialog> | Owner wants on demand; the read starts when the dialog mounts, one read per open, none on the page that holds the trigger |
 
 ## Open decisions
 

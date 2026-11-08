@@ -34,6 +34,8 @@ Offer to implement fixes afterwards, one PR per finding, highest severity first.
 
 **Say what is fine.** A hover prefetch that is one deduped read per row is a non-finding. Write it down as one. A report that only lists problems makes the reader wonder what else was missed.
 
+**On demand is a design, not a waterfall.** Fetching when a tab is opened, a dialog mounts or a page scrolls into view trades a spinner on first open for fewer requests per visit. The audit does not flag that. What it flags is the inverse: reads for panels the user has not opened (`eager-offscreen` in the catalog). Which side a screen should be on is the owner's call, so ask in scoping and record the answer; a click-then-fetch is a finding only when the owner wants instant open, and the fix is then a prefetch on intent, never a fetch at mount.
+
 **Numbers come from somewhere.** Every count in the report traces to a capture file or a code path. Do not invent "6+" or "roughly 100" from intuition; if you cannot measure, say "unmeasured" and give the formula (rows × reads per row).
 
 ## Workflow
@@ -45,6 +47,7 @@ Tell the user up front how long this takes. A static-only audit of a mid-sized a
 - Find the app root(s) and the data library from `package.json` (the scan prints both). Monorepos: scan each app separately.
 - Find the data layer: query key factories, transport/service modules, the `QueryClient` construction (or SWR config, Apollo client, RTK `createApi`). Read the defaults first; they set the baseline every finding is measured against.
 - List the screens that matter: usually the landing route after sign-in, the busiest list, and any screen left open for hours (a shell, a monitor). Ask the user if it is not obvious; otherwise pick those three and say so.
+- Ask the owner, for each screen that matters, whether it should open instantly (prefetch) or fetch on demand (fewer requests, a spinner on first open of a tab or dialog). Record the answer in the Scope table; it decides whether an eager read or a click-then-fetch is a finding. If you cannot ask, assume on demand and say so.
 - Record the commit: `git rev-parse HEAD`. Every report line refers to this revision.
 - Decide whether a live capture is possible: a running dev server plus a browser you can drive, or a HAR the user already has. If neither, the audit is static-only, and the report must say so in its first paragraph.
 
@@ -141,8 +144,8 @@ Use the rubric:
 | Severity | Growth class | Typical shapes |
 | --- | --- | --- |
 | P0 | Grows without a ceiling: with rows, with mounted observers, or with time | per-row query on a paginated list, per-instance poll timers in a shared hook (SWR, Apollo, hand-rolled), invalidation on every keystroke, uncleared interval |
-| P1 | Fixed multiplier on a hot path | staleTime 0 on a list every screen reads, refetch on every focus, effect-driven fetch with no cache, unbounded `Promise.all` fan-out |
-| P2 | Latency, bytes, or ownership, not count growth | serial awaits that could run together, fetch-everything page sizes, full detail read for a label, a TanStack poll defined in several callers |
+| P1 | Fixed multiplier on a hot path | staleTime 0 on a list every screen reads, refetch on every focus, effect-driven fetch with no cache, unbounded `Promise.all` fan-out, every tab's read mounted with the landing screen |
+| P2 | Latency, bytes, or ownership, not count growth | serial awaits that could run together, fetch-everything page sizes, full detail read for a label, a TanStack poll defined in several callers, reads for unopened panels on a cold screen |
 | P3 | Hygiene that enables the above | inline keys that drift, HTTP calls outside the data layer |
 | info | Worth recording, not a defect | hover prefetch that is one read per row, persistence and focus semantics, retry defaults |
 
@@ -166,6 +169,7 @@ The catalog has the detail; these are the names to use in the report so a reader
 | Narrow invalidation / setQueryData from the write response | root invalidation |
 | Dependent-key gating (`enabled` until the id exists) | double fetch with `undefined` then real id |
 | Parallel start (Promise.all / two queries) | serial awaits |
+| Fetch on open (`enabled` on the active state, query inside the panel, prefetch on intent) | reads for tabs, dialogs and panels the user has not opened |
 | Short-page stop | paging until an empty page |
 | Bounded fan-out (limiter + cancellation) | unbounded Promise.all |
 | Retry on 5xx/network only | default retry on 4xx |

@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: eager-offscreen-tabs
+expected_outcome: |
+  audit.md records the owner's stated intent (fetch on demand, a spinner on
+  first open is fine) and uses it to decide. Its top finding is that
+  src/components/agent-page.tsx mounts the runs and settings queries with the
+  page although only the active tab's panel renders, so every visit pays three
+  reads for one panel (3 → 1 per visit, as a formula; the audit is static-only).
+  The fix is to move each query into its panel or gate it with enabled on the
+  active tab, with prefetch on hover/intent offered only as the way to keep an
+  instant open; it must not recommend warming every tab in a route loader. It
+  states that LogsDialog is fine: its query lives in the dialog body, so the
+  read starts on open and the page that holds the trigger pays nothing. It does
+  not call that click-then-fetch a waterfall. The QueryClient defaults, the
+  key factory and the overview query are listed as checked and fine.
+context:
+  scaffold_script: place-files.sh

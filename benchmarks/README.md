@@ -6,6 +6,8 @@ The cases, prompts and assertions live in [`../evals/`](../evals). Every asserti
 
 ## Latest: iteration 2, 2026-11-04
 
+A fourth case, `eager-offscreen-tabs` (reads mounted for tabs the user has not opened, against an owner who asked for fetch on demand), was added on 2026-11-08 and has not been run yet.
+
 | Case | With overfetch | Without |
 | --- | --- | --- |
 | App audit: planted issues, file routes, a lazily loaded flag-gated dialog | 11 / 11 | 8 / 11 |

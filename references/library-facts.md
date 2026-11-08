@@ -21,6 +21,8 @@ Verified against `@tanstack/query-core` 5.102.
 
 **useQueries.** N observers. `combine` reshapes results; it does not merge requests. Batching is something the `queryFn` does, not the hook.
 
+**useInfiniteQuery.** One cache entry holds every loaded page. `fetchNextPage` is one request. Every other fetch of that key (invalidation, focus or mount refetch while stale, a poll) refetches every stored page in series, first to last: `infiniteQueryBehavior` with no `fetchMore` direction loops `remainingPages = oldPages.length`, awaiting `fetchPage` each time. A "load more" list the user scrolled 20 pages into costs 20 serial reads per refetch. `maxPages` caps the stored pages and so the refetch. Verified against query-core 5.102.7, `build/modern/infiniteQueryBehavior.js`.
+
 **enabled: false.** No fetch, ever, from this observer; it still subscribes to the cache entry. Use it for "read if someone else fetched it".
 
 **select.** A projection applied on read. The cache entry stays whole and shared; the component re-renders only when the selected slice changes.
@@ -33,9 +35,9 @@ Verified against `@tanstack/query-core` 5.102.
 
 **Persistence.** `persistQueryClient` / `PersistQueryClientProvider`: `maxAge` default 24 h; `buster` string invalidates the whole store when changed (set it to the build id). Restored queries are stale by their own staleTime and refetch on first observe if stale.
 
-**Suspense.** `useSuspenseQuery` in nested components waterfalls: the child does not render until the parent resolves. `useSuspenseQueries` or loader prefetch fixes it.
+**Suspense.** `useSuspenseQuery` in nested components waterfalls: the child does not render until the parent resolves. `useSuspenseQueries` or loader prefetch fixes it, for the queries the first paint shows; pulling a hidden tab's query into the loader to flatten the tree is `eager-offscreen`.
 
-**TanStack Router integration.** `loader: ({ context }) => context.queryClient.ensureQueryData(opts)` fetches before render and dedupes with the component's `useQuery` on the same key. Router `preload: "intent"` fires loaders on hover; combined with per-row loaders it is a hover fan-out. `defaultPreloadStaleTime` throttles repeat preloads.
+**TanStack Router integration.** `loader: ({ context }) => context.queryClient.ensureQueryData(opts)` fetches before render and dedupes with the component's `useQuery` on the same key. Router `preload: "intent"` fires loaders on hover; combined with per-row loaders it is a hover fan-out. `defaultPreloadStaleTime` throttles repeat preloads. A loader that `ensureQueryData`s every tab's query on a route is `eager-offscreen`; give each tab its own route and let `preload: "intent"` warm it on hover instead.
 
 **v4 differences.** `cacheTime` instead of `gcTime`; `keepPreviousData: true` instead of `placeholderData: keepPreviousData`; `useQuery(key, fn, opts)` overloads; `isLoading` means what v5 calls `isPending`. Polling and focus semantics are the same.
 

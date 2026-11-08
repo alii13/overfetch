@@ -2,7 +2,7 @@
 
 One entry per pattern the tools report, keyed by the detector id that appears in `scan.md` and `capture.md`. Each entry has the shape of the problem, how to confirm it, what makes it a non-finding, and the fix with a sketch. Sketches use TanStack Query; the idea carries to SWR, Apollo and RTK Query with the names in `library-facts.md`.
 
-Contents: [per-row-query](#per-row-query) · [shared-poll-timer](#shared-poll-timer) · [always-on-poll](#always-on-poll) · [hand-rolled-poll](#hand-rolled-poll) · [default-stale-zero](#default-stale-zero) · [zero-freshness](#zero-freshness) · [focus-refetch](#focus-refetch) · [broad-invalidation](#broad-invalidation) · [key-drift](#key-drift) · [dependent-key-double-fetch](#dependent-key-double-fetch) · [effect-fetch](#effect-fetch) · [fetch-in-view](#fetch-in-view) · [serial-awaits](#serial-awaits) · [suspense-waterfall](#suspense-waterfall) · [fetch-all](#fetch-all) · [pagination-overshoot](#pagination-overshoot) · [detail-for-label](#detail-for-label) · [unbounded-parallel](#unbounded-parallel) · [hover-prefetch](#hover-prefetch) · [retry-policy](#retry-policy) · [error-replay](#error-replay) · [remount-refetch](#remount-refetch) · [event-invalidation-storm](#event-invalidation-storm) · [platform-notes](#platform-notes)
+Contents: [per-row-query](#per-row-query) · [shared-poll-timer](#shared-poll-timer) · [always-on-poll](#always-on-poll) · [hand-rolled-poll](#hand-rolled-poll) · [default-stale-zero](#default-stale-zero) · [zero-freshness](#zero-freshness) · [focus-refetch](#focus-refetch) · [broad-invalidation](#broad-invalidation) · [key-drift](#key-drift) · [dependent-key-double-fetch](#dependent-key-double-fetch) · [effect-fetch](#effect-fetch) · [fetch-in-view](#fetch-in-view) · [serial-awaits](#serial-awaits) · [suspense-waterfall](#suspense-waterfall) · [eager-offscreen](#eager-offscreen) · [fetch-all](#fetch-all) · [pagination-overshoot](#pagination-overshoot) · [detail-for-label](#detail-for-label) · [unbounded-parallel](#unbounded-parallel) · [hover-prefetch](#hover-prefetch) · [retry-policy](#retry-policy) · [error-replay](#error-replay) · [remount-refetch](#remount-refetch) · [event-invalidation-storm](#event-invalidation-storm) · [platform-notes](#platform-notes)
 
 ---
 
@@ -232,7 +232,33 @@ const orgs = await api.listOrgs()   // independent
 
 **Cost.** Latency grows with nesting depth.
 
-**Fix.** Prefetch in the route loader (`ensureQueryData` for each query the route needs, started together), or `useSuspenseQueries` at the level that knows all the keys.
+**Fix.** Prefetch in the route loader (`ensureQueryData` for each query the first paint needs, started together), or `useSuspenseQueries` at the level that knows all the keys. Prefetch only what the first paint shows; a loader that warms every tab trades the waterfall for `eager-offscreen`.
+
+---
+
+## eager-offscreen
+
+**Shape.** A read for UI the user has not opened: every tab's query mounted with the tab strip, a dialog's query placed on the trigger rather than the body, a loader that `ensureQueryData`s every panel on the route, a collapsed section whose body stays mounted.
+
+```tsx
+function AgentPage({ id }: { id: string }) {
+  const overview = useQuery(agentQueries.overview(id))
+  const runs = useQuery(agentQueries.runs(id))         // only shown on the Runs tab
+  const settings = useQuery(agentQueries.settings(id)) // only shown on the Settings tab
+  const [tab, setTab] = useState("overview")
+  // ...renders one panel
+}
+```
+
+**Cost.** Every visit pays for every panel; the user sees one. Growth: a fixed multiplier per visit (P1 on a landing or hot screen, P2 elsewhere). Each eager read is also one more mounted observer for focus refetches, invalidation and polling to multiply.
+
+**Confirm.** Open the screen in code and list what the first paint renders. A read whose result is only rendered behind a tab, a dialog, an accordion or a scroll position is eager. Then check the owner's answer from scoping: if they asked for the tab to open with no spinner, the prefetch is the design and this is a non-finding. In a capture the shape is N reads on route entry for a screen that shows one panel.
+
+**Non-finding when:** the owner asked for instant open; the hidden panel reads the same cache entry the visible one does (`select` over one read); the read fires only on intent (hover, focus, router `preload: "intent"`); the panels are a handful, the reads are cheap, and the owner knows the trade.
+
+**Fix: fetch on open.** Move the query into the panel component so it mounts with the panel, or gate it: `useQuery({ ...agentQueries.runs(id), enabled: tab === "runs" })`. For a dialog, put the query in the dialog body, not the trigger. To keep the open instant without paying at mount, prefetch on intent: `onPointerEnter={() => queryClient.prefetchQuery(agentQueries.runs(id))}` on the tab trigger, or `preload: "intent"` on a tab route, with a staleTime so the open does not refetch what the hover just loaded.
+
+The inverse, a click that then fetches, is on demand by design. It is a finding only when the owner wants instant open, and the fix is then prefetch on intent, never fetch at mount. The capture analyser already treats it that way: a chain breaks at the `--chain-gap-ms` gap, and a fetch that waits for a click sits well past it.
 
 ---
 
